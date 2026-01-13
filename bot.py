@@ -94,7 +94,9 @@ api = ShoonyaApiPy()
 # Support both naming conventions
 UID = os.getenv('UID') or os.getenv('SHOONYA_USERID')
 PWD = os.getenv('PWD') or os.getenv('SHOONYA_PASSWORD')
-TOTP_KEY = os.getenv('TOTP_KEY') or os.getenv('SHOONYA_API_SECRET')
+# TOTP key priority: TOTP_SECRET > TOTP_KEY > SHOONYA_API_SECRET
+# TOTP_SECRET is base32 format, SHOONYA_API_SECRET might be hex
+TOTP_KEY = os.getenv('TOTP_SECRET') or os.getenv('TOTP_KEY') or os.getenv('SHOONYA_API_SECRET')
 VENDOR_CODE = os.getenv('VENDOR_CODE') or os.getenv('SHOONYA_VENDOR_CODE', 'NA')
 APP_KEY = os.getenv('APP_KEY', '')
 IMEI = os.getenv('IMEI') or os.getenv('SHOONYA_IMEI', 'abc1234')
@@ -123,9 +125,36 @@ def login_to_shoonya():
             trade_data["last_error"] = "Missing credentials"
             return False
         
+        # Validate TOTP key format (must be base32: A-Z, 2-7, no spaces)
+        if not TOTP_KEY:
+            print("❌ TOTP_KEY is empty!")
+            trade_data["last_error"] = "TOTP_KEY is empty"
+            return False
+        
+        # Clean TOTP key (remove spaces, convert to uppercase)
+        TOTP_KEY_clean = TOTP_KEY.strip().replace(' ', '').upper()
+        
+        # Validate base32 format
+        import re
+        base32_pattern = re.compile(r'^[A-Z2-7]+$')
+        if not base32_pattern.match(TOTP_KEY_clean):
+            print(f"❌ TOTP_KEY format invalid! Must be base32 (A-Z, 2-7 only)")
+            print(f"   Current value length: {len(TOTP_KEY_clean)}")
+            print(f"   First 10 chars: {TOTP_KEY_clean[:10]}...")
+            print(f"   Example valid format: JBSWY3DPEHPK3PXP")
+            trade_data["last_error"] = f"TOTP_KEY invalid format (must be base32: A-Z, 2-7 only). Length: {len(TOTP_KEY_clean)}"
+            return False
+        
         # Generate TOTP
-        totp = pyotp.TOTP(TOTP_KEY)
-        totp_code = totp.now()
+        try:
+            totp = pyotp.TOTP(TOTP_KEY_clean)
+            totp_code = totp.now()
+        except Exception as e:
+            print(f"❌ TOTP generation failed: {e}")
+            print(f"   TOTP_KEY length: {len(TOTP_KEY_clean)}")
+            print(f"   TOTP_KEY should be 16-32 characters base32 string")
+            trade_data["last_error"] = f"TOTP generation failed: {str(e)}"
+            return False
         
         print(f"🔐 Logging in to Shoonya with UID: {UID}")
         

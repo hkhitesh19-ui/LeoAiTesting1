@@ -1,0 +1,17 @@
+# FastAPI Backend Dependencies
+fastapi==0.109.0
+uvicorn==0.27.0
+requests==2.31.0
+python-dotenv==1.0.0
+
+# Telegram Integration
+pyTelegramBotAPI==4.14.0
+
+# Shoonya Trading API
+NorenRestApiPy==0.0.23
+pyotp==2.9.0
+
+# Data Processing & Excel
+pandas==2.1.4
+openpyxl==3.1.2
+numpy==1.26.2

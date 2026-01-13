@@ -1,4 +1,4 @@
-# Core Dependencies (Minimal - Will Work!)
+# Core Dependencies
 fastapi==0.109.0
 uvicorn==0.27.0
 gunicorn==21.2.0
@@ -7,5 +7,6 @@ pyTelegramBotAPI==4.14.0
 pyotp==2.9.0
 websocket-client==1.6.4
 
-# Shoonya API (NorenRestApiPy alternative - lighter)
-# Will install manually in code
+# Shoonya Trading API
+# Try PyPI first, fallback to GitHub if needed
+NorenRestApiPy==0.0.23

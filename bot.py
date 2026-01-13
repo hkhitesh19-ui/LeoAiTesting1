@@ -13,20 +13,35 @@ import threading
 try:
     from NorenRestApiPy.NorenApi import NorenApi
     NOREN_AVAILABLE = True
+    print("✅ NorenRestApiPy imported successfully")
 except ImportError:
     print("⚠️ NorenRestApiPy not installed. Installing dynamically...")
     try:
         import subprocess
         import sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "NorenRestApiPy==0.0.23"])
+        print("📦 Installing NorenRestApiPy==0.0.23...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "NorenRestApiPy==0.0.23", "--quiet"])
         from NorenRestApiPy.NorenApi import NorenApi
         NOREN_AVAILABLE = True
+        print("✅ NorenRestApiPy installed and imported successfully")
     except Exception as e:
         print(f"❌ Could not install NorenRestApiPy: {e}")
-        # Create a dummy class for now
+        print("⚠️ Creating fallback class (limited functionality)")
+        # Create a minimal fallback class with login method
         class NorenApi:
             def __init__(self, *args, **kwargs):
-                pass
+                self.host = kwargs.get('host', '')
+                self.websocket = kwargs.get('websocket', '')
+                print("⚠️ Using fallback NorenApi class - NorenRestApiPy not available")
+            
+            def login(self, *args, **kwargs):
+                raise Exception("NorenRestApiPy not installed. Please install: pip install NorenRestApiPy==0.0.23")
+            
+            def get_quotes(self, *args, **kwargs):
+                return None
+            
+            def searchscrip(self, *args, **kwargs):
+                return None
         NOREN_AVAILABLE = False
 
 # Telegram alert functions will be imported dynamically to avoid circular import

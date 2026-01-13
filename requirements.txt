@@ -7,6 +7,5 @@ pyTelegramBotAPI==4.14.0
 pyotp==2.9.0
 websocket-client==1.6.4
 
-# Shoonya Trading API
-# Try PyPI first, fallback to GitHub if needed
-NorenRestApiPy==0.0.23
+# Shoonya Trading API (from GitHub - PyPI version has issues)
+git+https://github.com/Shoonya-Dev/ShoonyaApi-py.git@master

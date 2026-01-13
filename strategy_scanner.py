@@ -3,16 +3,24 @@ Type F Strategy Scanner
 Handles trade logging and Excel file management
 """
 
-import pandas as pd
 import os
 from datetime import datetime
+
+# Try to import pandas, if not available use CSV fallback
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    print("⚠️ pandas not installed. Using CSV fallback for logging.")
+    PANDAS_AVAILABLE = False
+    import csv
 
 # Excel file path
 EXCEL_FILE = "Type_F_Trading_Logs.xlsx"
 
 def log_trade_to_excel(trade_record):
     """
-    Log trade to Excel file
+    Log trade to Excel/CSV file
     
     Args:
         trade_record: dict with keys: time, symbol, type, entry, exit, pnl, reason
@@ -32,45 +40,53 @@ def log_trade_to_excel(trade_record):
             'Exit Time': trade_record.get('exitTime', '')
         }
         
-        # Check if file exists
-        if os.path.exists(EXCEL_FILE):
-            # Read existing data
-            df = pd.read_excel(EXCEL_FILE)
-            # Append new row
-            df = pd.concat([df, pd.DataFrame([log_entry])], ignore_index=True)
+        if PANDAS_AVAILABLE:
+            # Use pandas for Excel
+            if os.path.exists(EXCEL_FILE):
+                df = pd.read_excel(EXCEL_FILE)
+                df = pd.concat([df, pd.DataFrame([log_entry])], ignore_index=True)
+            else:
+                df = pd.DataFrame([log_entry])
+            df.to_excel(EXCEL_FILE, index=False)
+            print(f"✅ Trade logged to {EXCEL_FILE}")
         else:
-            # Create new DataFrame
-            df = pd.DataFrame([log_entry])
-        
-        # Save to Excel
-        df.to_excel(EXCEL_FILE, index=False)
-        print(f"✅ Trade logged to {EXCEL_FILE}")
+            # Fallback: Use CSV
+            csv_file = "Type_F_Trading_Logs.csv"
+            file_exists = os.path.exists(csv_file)
+            with open(csv_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=log_entry.keys())
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(log_entry)
+            print(f"✅ Trade logged to {csv_file}")
         
     except Exception as e:
-        print(f"❌ Error logging to Excel: {e}")
+        print(f"❌ Error logging trade: {e}")
 
 def get_today_trades():
     """
-    Get today's trades from Excel
+    Get today's trades from Excel/CSV
     Returns list of trade dicts
     """
     try:
-        if not os.path.exists(EXCEL_FILE):
-            return []
-        
-        df = pd.read_excel(EXCEL_FILE)
-        today = datetime.now().strftime('%Y-%m-%d')
-        
-        # Filter today's trades
-        today_df = df[df['Date'] == today]
-        
-        # Convert to list of dicts
-        trades = today_df.to_dict('records')
-        
-        return trades
-        
+        if PANDAS_AVAILABLE and os.path.exists(EXCEL_FILE):
+            df = pd.read_excel(EXCEL_FILE)
+            today = datetime.now().strftime('%Y-%m-%d')
+            today_df = df[df['Date'] == today]
+            return today_df.to_dict('records')
+        elif os.path.exists("Type_F_Trading_Logs.csv"):
+            # CSV fallback
+            trades = []
+            today = datetime.now().strftime('%Y-%m-%d')
+            with open("Type_F_Trading_Logs.csv", 'r') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('Date') == today:
+                        trades.append(row)
+            return trades
+        return []
     except Exception as e:
-        print(f"❌ Error reading Excel: {e}")
+        print(f"❌ Error reading trades: {e}")
         return []
 
 def calculate_today_pnl():

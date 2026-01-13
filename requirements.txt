@@ -1,15 +1,10 @@
-# FastAPI Backend Dependencies
+# Core Dependencies (Minimal - Will Work!)
 fastapi==0.109.0
-uvicorn[standard]==0.27.0
+uvicorn==0.27.0
 requests==2.31.0
-
-# Telegram Integration
 pyTelegramBotAPI==4.14.0
-
-# Shoonya Trading API
-git+https://github.com/Shoonya-Dev/ShoonyaApi-py.git
 pyotp==2.9.0
+websocket-client==1.6.4
 
-# Data Processing & Excel
-pandas==2.1.4
-openpyxl==3.1.2
+# Shoonya API (NorenRestApiPy alternative - lighter)
+# Will install manually in code

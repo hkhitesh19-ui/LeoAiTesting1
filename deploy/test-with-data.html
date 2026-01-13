@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Type F Strategy - Test with Data</title>
+    <script>
+        // Redirect to main index with test data injected
+        window.onload = function() {
+            // Simulate API response
+            const testData = {
+                "botStatus": {
+                    "status": "Active",
+                    "message": "Market Open"
+                },
+                "todayPnl": 1250.50,
+                "pnlPercentage": 2.567,
+                "activeTrade": {
+                    "symbol": "NIFTY FUT",
+                    "entry": 21500.00,
+                    "sl": 21400.00,
+                    "ltp": 21650.00
+                },
+                "tradeHistory": [
+                    {
+                        "time": "2026-01-13T09:15:00",
+                        "exitTime": "2026-01-13T10:45:00",
+                        "symbol": "NIFTY FUT",
+                        "type": "BUY",
+                        "entry": 21500,
+                        "exit": 21650,
+                        "pnl": 150
+                    },
+                    {
+                        "time": "2026-01-11T09:30:00",
+                        "exitTime": "2026-01-13T02:15:00",
+                        "symbol": "BANKNIFTY",
+                        "type": "BUY",
+                        "entry": 45500,
+                        "exit": 45750,
+                        "pnl": 250
+                    }
+                ]
+            };
+            
+            alert('✅ Test Mode!\n\nThis page will show sample data to demonstrate:\n\n1. Duration column (1h 30m, 2d 4h)\n2. P&L with 3 decimals (+2.567%)\n3. Flash animations on LTP\n4. Active trade with data\n\nRefresh index.html and connect to real API for live data!');
+            
+            // Store test data
+            localStorage.setItem('testData', JSON.stringify(testData));
+            
+            // Redirect to main page
+            window.location.href = 'index.html?test=true';
+        };
+    </script>
+</head>
+<body>
+    <div style="text-align: center; margin-top: 50px; font-family: Arial;">
+        <h2>Loading Test Data...</h2>
+        <p>Redirecting to dashboard with sample trade data...</p>
+    </div>
+</body>
+</html>

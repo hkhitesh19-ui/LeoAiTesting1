@@ -6,10 +6,28 @@ Main bot file that handles Shoonya login, strategy execution, and trade manageme
 import os
 import time
 from datetime import datetime, timedelta
-from NorenRestApiPy.NorenApi import NorenApi
 import pyotp
-import pandas as pd
 import threading
+
+# Try to import NorenRestApiPy, if not available use fallback
+try:
+    from NorenRestApiPy.NorenApi import NorenApi
+    NOREN_AVAILABLE = True
+except ImportError:
+    print("⚠️ NorenRestApiPy not installed. Installing dynamically...")
+    try:
+        import subprocess
+        import sys
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "NorenRestApiPy==0.0.23"])
+        from NorenRestApiPy.NorenApi import NorenApi
+        NOREN_AVAILABLE = True
+    except Exception as e:
+        print(f"❌ Could not install NorenRestApiPy: {e}")
+        # Create a dummy class for now
+        class NorenApi:
+            def __init__(self, *args, **kwargs):
+                pass
+        NOREN_AVAILABLE = False
 
 # Telegram alert functions will be imported dynamically to avoid circular import
 # Initialize with dummy functions

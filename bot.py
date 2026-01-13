@@ -19,8 +19,27 @@ except ImportError:
     try:
         import subprocess
         import sys
-        print("📦 Installing NorenRestApiPy from GitHub...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "git+https://github.com/Shoonya-Dev/ShoonyaApi-py.git@master", "--quiet"])
+        print("📦 Installing NorenRestApiPy...")
+        # Install from PyPI (package name might vary)
+        install_commands = [
+            ["NorenRestApiPy==0.0.23"],
+            ["NorenRestApiPy"],
+            ["finvasia"],
+        ]
+        installed = False
+        for cmd in install_commands:
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install"] + cmd + ["--quiet", "--no-cache-dir"], 
+                                    stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                # Verify import works
+                from NorenRestApiPy.NorenApi import NorenApi
+                installed = True
+                print(f"✅ Installed using: {' '.join(cmd)}")
+                break
+            except:
+                continue
+        if not installed:
+            raise Exception("Could not install NorenRestApiPy from any source")
         from NorenRestApiPy.NorenApi import NorenApi
         NOREN_AVAILABLE = True
         print("✅ NorenRestApiPy installed and imported successfully")

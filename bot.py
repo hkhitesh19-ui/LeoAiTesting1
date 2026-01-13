@@ -91,12 +91,13 @@ api = ShoonyaApiPy()
 # ==========================================
 # Configuration from Environment Variables
 # ==========================================
-UID = os.getenv('UID')
-PWD = os.getenv('PWD')
-TOTP_KEY = os.getenv('TOTP_KEY')
-VENDOR_CODE = os.getenv('VENDOR_CODE', 'NA')
+# Support both naming conventions
+UID = os.getenv('UID') or os.getenv('SHOONYA_USERID')
+PWD = os.getenv('PWD') or os.getenv('SHOONYA_PASSWORD')
+TOTP_KEY = os.getenv('TOTP_KEY') or os.getenv('SHOONYA_API_SECRET')
+VENDOR_CODE = os.getenv('VENDOR_CODE') or os.getenv('SHOONYA_VENDOR_CODE', 'NA')
 APP_KEY = os.getenv('APP_KEY', '')
-IMEI = os.getenv('IMEI', 'abc1234')
+IMEI = os.getenv('IMEI') or os.getenv('SHOONYA_IMEI', 'abc1234')
 
 # ==========================================
 # Trading Parameters

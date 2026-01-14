@@ -8,4 +8,3 @@ pyotp==2.9.0
 websocket-client==1.6.4
 
 # Shoonya Trading API (from GitHub - PyPI version has issues)
-git+https://github.com/Shoonya-Dev/ShoonyaApi-py.git@master

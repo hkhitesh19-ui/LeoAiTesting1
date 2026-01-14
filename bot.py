@@ -1,4 +1,4 @@
-"""
+﻿"""
 Type F Trading Strategy Bot (Render-ready)
 - Handles Shoonya login
 - Finds NIFTY current month future token
@@ -15,7 +15,7 @@ from datetime import datetime
 import pyotp
 
 # REQUIRED dependency (must be in requirements.txt)
-from NorenRestApiPy.NorenApi import NorenApi
+from NorenApi import NorenApi
 
 
 # ==============================
@@ -65,14 +65,17 @@ api = ShoonyaApiPy()
 # ==============================
 # ENV VARS (Render)
 # ==============================
-UID = os.getenv("UID") or os.getenv("SHOONYA_USERID")
-PWD = os.getenv("PWD") or os.getenv("SHOONYA_PASSWORD")
-VENDOR_CODE = os.getenv("VENDOR_CODE") or os.getenv("SHOONYA_VENDOR_CODE", "NA")
-APP_KEY = os.getenv("APP_KEY") or os.getenv("SHOONYA_API_SECRET", "")
+UID = os.getenv("SHOONYA_USERID")
+PWD = os.getenv("SHOONYA_PASSWORD")
+APP_KEY = os.getenv("SHOONYA_API_SECRET") or os.getenv("APP_KEY") or ""
+VENDOR_CODE = os.getenv("SHOONYA_VENDOR_CODE") or os.getenv("VENDOR_CODE") or "NA"
+vendor_code= os.getenv("VENDOR_CODE") or os.getenv("SHOONYA_VENDOR_CODE", "NA")
+api_secret= os.getenv("APP_KEY") or os.getenv("SHOONYA_API_SECRET", "")
 IMEI = os.getenv("IMEI") or os.getenv("SHOONYA_IMEI", "abc1234")
 
+
 # Shoonya TOTP Secret (base32)
-TOTP_KEY = os.getenv("TOTP_KEY") or os.getenv("TOTP_SECRET")
+TOTP_KEY = os.getenv("TOTP_SECRET")
 
 
 # ==============================
@@ -104,7 +107,7 @@ def login_to_shoonya() -> bool:
     try:
         if not UID or not PWD or not TOTP_KEY:
             trade_data["last_error"] = "Missing UID/PWD/TOTP_KEY"
-            print("❌ Missing UID / PWD / TOTP_KEY env vars")
+            print("❌ Missing SHOONYA_USERID / SHOONYA_PASSWORD / TOTP_SECRET env vars")
             return False
 
         key = TOTP_KEY.strip().replace(" ", "").upper()
@@ -127,6 +130,10 @@ def login_to_shoonya() -> bool:
             api_secret=APP_KEY,
             imei=IMEI,
         )
+
+        print("DEBUG LOGIN RET:", ret)
+
+
 
         if ret and ret.get("stat") == "Ok":
             trade_data["last_error"] = None
@@ -264,3 +271,24 @@ if __name__ == "__main__":
     # keep alive if run directly
     while True:
         time.sleep(60)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

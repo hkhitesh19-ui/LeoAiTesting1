@@ -7,7 +7,8 @@ from datetime import datetime
 import os
 
 app = FastAPI()
-
+
+
 
 
 
@@ -189,9 +190,7 @@ def shutdown_event():
         else:
             print("⚠️ bot.stop_bot() not found")
     except Exception as e:
-<<<<<<< HEAD
-        print(f"❌ Failed to send Telegram alert: {e}")
-        return False
+        print(f"❌ Error in stop_bot: {e}")
 
 def send_trade_entry_alert(symbol, price, sl, strategy="Type F"):
     """Entry alert with formatted message"""
@@ -448,6 +447,3 @@ send_telegram_alert("📊 *Daily Report*\n\nTotal P&L: ₹5,000\nTrades: 3")
 # To run locally: uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
 =======
         print(f"⚠️ shutdown_event error: {e}")
-
-
->>>>>>> 2cd3a45f2275d21d9c48c61c9f777194b624912e

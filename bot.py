@@ -226,7 +226,7 @@ def get_live_ltp() -> float:
         # If market closed, store as last_close once
         # (if ltp looks valid and time exists)
         if ltp > 0:
-            trade_data["last_close"] = ltp
+            trade_data["last_close"] = float(q.get("pc", q.get("c", ltp)))
             trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return ltp
@@ -272,7 +272,7 @@ def bot_loop():
                 q = api.get_quotes(exchange="NFO", token=tok)
 
                 if q and q.get("lp"):
-                    ltp = float(q["lp"])
+                    ltp = float(q.get("lp", q.get("pc", 0)))
                     trade_data["current_ltp"] = ltp
 
                     # update last_close only if it exists

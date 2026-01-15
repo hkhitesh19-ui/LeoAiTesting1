@@ -1,0 +1,12 @@
+.env
+*.log
+*.xlsx
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+.DS_Store
+
+patch_*.py
+
+patch_*.py

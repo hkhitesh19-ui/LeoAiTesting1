@@ -1,155 +1,195 @@
+﻿from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import requests
-import os
 from datetime import datetime
-import threading
-import telebot  # pip install pyTelegramBotAPI
+import os
 
-# ==========================================
-# Telegram Alert System
-# ==========================================
+app = FastAPI()
+
 
-# Render ke Environment Variables se values uthayega
-TOKEN = os.getenv('TELEGRAM_TOKEN')
-CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-# Emergency Stop Bot (Telegram se bot control karne ke liye)
-emergency_stop_flag = False
 
-if TOKEN and CHAT_ID:
+_BOT_THREAD = None
+
+@app.api_route("/", methods=["GET","HEAD"])
+def root():
+    return {"status": "ok"}
+
+@app.on_event("startup")
+async def startup_event():
     try:
-        bot = telebot.TeleBot(TOKEN, threaded=False)
-        
-        @bot.message_handler(commands=['stop', 'exit', 'emergency'])
-        def handle_emergency_stop(message):
-            """Emergency Stop: Telegram se bot ko turant band kar dega"""
-            global emergency_stop_flag
-            
-            # Security: Sirf authorized user hi stop kar sakta hai
-            if str(message.chat.id) == str(CHAT_ID):
-                emergency_stop_flag = True
-                bot.reply_to(message, 
-                    "🛑 *EMERGENCY STOP RECEIVED!*\n\n"
-                    "⚠️ Exiting all positions...\n"
-                    "⚠️ Shutting down bot...\n\n"
-                    "_This action cannot be undone._",
-                    parse_mode="Markdown"
-                )
-                
-                send_telegram_alert("🔴 *EMERGENCY SHUTDOWN INITIATED*\n\nBot is stopping now!")
-                
-                # Yahan aapka exit logic aayega
-                # Example: close_all_positions()
-                # Example: cancel_all_orders()
-                
-                # Bot process ko kill kar dega (production mein use carefully)
-                import signal
-                os.kill(os.getpid(), signal.SIGTERM)
-            else:
-                bot.reply_to(message, "⛔ Unauthorized! You are not allowed to control this bot.")
-        
-        @bot.message_handler(commands=['status'])
-        def handle_status(message):
-            """Status Check: Bot ka current status check karne ke liye"""
-            if str(message.chat.id) == str(CHAT_ID):
-                # Get live data
-                active = trade_data.get("active", False)
-                entry = float(trade_data.get("entry_price", 0.0) or 0.0)
-                sl = float(trade_data.get("sl_price", 0.0) or 0.0)
-                ltp = get_live_ltp()
-                
-                # Calculate P&L
-                pnl = 0.0
-                if active and entry > 0 and ltp > 0:
-                    pnl = ltp - entry
-                
-                status_text = "✅ *Bot Status: RUNNING*\n\n"
-                
-                if active and entry > 0:
-                    status_text += f"📊 *Active Trade*\n"
-                    status_text += f"Symbol: {trade_data.get('symbol', 'NIFTY FUT')}\n"
-                    status_text += f"Entry: ₹{entry:,.2f}\n"
-                    status_text += f"LTP: ₹{ltp:,.2f}\n"
-                    status_text += f"SL: ₹{sl:,.2f}\n"
-                    status_text += f"P&L: ₹{pnl:,.2f}\n\n"
-                else:
-                    status_text += "📊 Active Trades: 0\n"
-                    status_text += "💰 Today's P&L: ₹0.00\n\n"
-                
-                status_text += "🕐 Server: Online\n"
-                status_text += f"🔗 Bot Connected: {'Yes' if BOT_CONNECTED else 'No'}\n\n"
-                status_text += "_Use /stop for emergency shutdown_"
-                
-                bot.reply_to(message, status_text, parse_mode="Markdown")
-            else:
-                bot.reply_to(message, "⛔ Unauthorized!")
-        
-        @bot.message_handler(commands=['help'])
-        def handle_help(message):
-            """Help: Available commands"""
-            if str(message.chat.id) == str(CHAT_ID):
-                bot.reply_to(message,
-                    "🤖 *Type F Bot Commands*\n\n"
-                    "/status - Check bot status\n"
-                    "/stop - Emergency shutdown\n"
-                    "/exit - Same as /stop\n"
-                    "/emergency - Same as /stop\n"
-                    "/help - Show this message\n\n"
-                    "_Bot is actively monitoring markets_",
-                    parse_mode="Markdown"
-                )
-        
-        # Start bot polling in background thread
-        def start_telegram_bot():
-            try:
-                print("🤖 Telegram Emergency Stop Bot started!")
-                send_telegram_alert("🟢 *Bot is now ONLINE!*\n\n_Emergency stop commands are active_")
-                bot.polling(non_stop=True, timeout=60)
-            except Exception as e:
-                print(f"⚠️ Telegram bot error: {e}")
-        
-        # Start in background thread so it doesn't block FastAPI
-        telegram_thread = threading.Thread(target=start_telegram_bot, daemon=True)
-        telegram_thread.start()
-        
+        from bot import start_bot_thread
+        start_bot_thread()
+        print("✅ Bot auto-started on API startup")
     except Exception as e:
-        print(f"⚠️ Failed to initialize Telegram bot: {e}")
-        bot = None
-else:
-    print("⚠️ Telegram credentials not set. Emergency stop feature disabled.")
-    bot = None
+        print("⚠️ Bot auto-start failed:", e)
 
-def send_telegram_alert(message):
-    """
-    Telegram par alert bhejne ka function
-    
-    Args:
-        message (str): The message to send (supports Markdown formatting)
-    
-    Returns:
-        bool: True if sent successfully, False otherwise
-    """
-    if not TOKEN or not CHAT_ID:
-        print("⚠️ Telegram Credentials missing! Set TELEGRAM_TOKEN and TELEGRAM_CHAT_ID")
-        return False
-        
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"  # Isse text bold/italic dikhega
+# CORS for Netlify frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Import bot runtime state
+BOT_CONNECTED = False
+trade_data = None
+
+try:
+    import bot  # auto-starts bot thread
+    trade_data = bot.trade_data
+    BOT_CONNECTED = True
+    print("✅ bot.py connected: trade_data imported")
+except Exception as e:
+    BOT_CONNECTED = False
+    trade_data = {
+        "active": False,
+        "last_run": None,
+        "last_error": f"bot import failed: {e}",
+        "symbol": "NIFTY FUT",
+        "fut_token": None,
+        "entry_price": 0.0,
+        "sl_price": 0.0,
+        "current_ltp": 0.0,
+        "last_close": 0.0,
+        "trade_history": [],
     }
-    
+    print(f"⚠️ bot.py import failed: {e}")
+
+
+def safe_float(x) -> float:
     try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            print(f"✅ Telegram alert sent: {message[:50]}...")
-            return True
-        else:
-            print(f"❌ Telegram Error: {response.text}")
-            return False
+        return float(x or 0.0)
+    except Exception:
+        return 0.0
+
+
+def safe_get_live_ltp() -> float:
+    """
+    Prefer live LTP via bot.get_live_ltp() else fallback last_close.
+    This ensures AFTER MARKET also some price shown.
+    """
+    try:
+        if BOT_CONNECTED:
+            ltp = safe_float(bot.get_live_ltp())
+            if ltp > 0:
+                return ltp
+    except Exception:
+        pass
+
+    # fallback
+    return safe_float(trade_data.get("last_close", 0.0))
+
+
+@app.get("/")
+async def root():
+    return {"ok": True, "service": "Type F API", "time": datetime.now().isoformat()}
+
+
+@app.get("/health")
+async def health():
+    return {
+        "ok": True,
+        "bot_connected": BOT_CONNECTED,
+        "timestamp": datetime.now().isoformat(),
+        "last_run": trade_data.get("last_run"),
+        "last_error": trade_data.get("last_error"),
+    }
+
+
+@app.get("/get_status")
+async def get_status():
+    """
+    Frontend dashboard endpoint
+    """
+    try:
+        active = bool(trade_data.get("active", False))
+
+        entry = safe_float(trade_data.get("entry_price"))
+        sl = safe_float(trade_data.get("sl_price"))
+
+        ltp_val = safe_get_live_ltp()
+
+        today_pnl = 0.0
+        pnl_pct = 0.0
+
+        if active and entry > 0 and ltp_val > 0:
+            today_pnl = ltp_val - entry
+            pnl_pct = ((ltp_val - entry) / entry) * 100.0
+
+        history = trade_data.get("trade_history") or []
+        if not isinstance(history, list):
+            history = []
+
+        return {
+            "botStatus": {
+                "status": "Active" if active else "Searching",
+                "message": "Market Open" if active else "Scanning",
+            },
+            "todayPnl": round(today_pnl, 2),
+            "pnlPercentage": round(pnl_pct, 3),
+            "activeTrade": {
+    "symbol": "NIFTY FUT",
+    "entry": float(trade_data.get("entry_price", 0.0)),
+    "sl": float(trade_data.get("sl_price", 0.0)),
+    "ltp": float(trade_data.get("current_ltp") or 0.0),
+    "close": float(trade_data.get("last_close") or 0.0),
+    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 0.0)
+},
+            "tradeHistory": history[:50],
+        }
+
     except Exception as e:
+        # never crash
+        return {
+            "botStatus": {"status": "Error", "message": "API error"},
+            "todayPnl": 0.0,
+            "pnlPercentage": 0.0,
+            "activeTrade": {
+    "symbol": "NIFTY FUT",
+    "entry": float(trade_data.get("entry_price", 0.0)),
+    "sl": float(trade_data.get("sl_price", 0.0)),
+    "ltp": float(trade_data.get("current_ltp") or 0.0),
+    "close": float(trade_data.get("last_close") or 0.0),
+    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 0.0)
+},
+            "tradeHistory": [],
+            "error": str(e),
+        }
+
+
+
+
+
+@app.get('/health')
+@app.head('/health')
+async def health_check():
+    return {'status': 'healthy'}
+
+
+
+
+
+
+
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    print("🛑 Shutdown event triggered (Render TERM). Stopping bot safely...")
+    try:
+        import bot
+        if hasattr(bot, "stop_bot"):
+            bot.stop_bot()
+            print("✅ bot.stop_bot() called")
+        else:
+            print("⚠️ bot.stop_bot() not found")
+    except Exception as e:
+<<<<<<< HEAD
         print(f"❌ Failed to send Telegram alert: {e}")
         return False
 
@@ -406,3 +446,8 @@ send_telegram_alert("📊 *Daily Report*\n\nTotal P&L: ₹5,000\nTrades: 3")
 """
 
 # To run locally: uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
+=======
+        print(f"⚠️ shutdown_event error: {e}")
+
+
+>>>>>>> 2cd3a45f2275d21d9c48c61c9f777194b624912e

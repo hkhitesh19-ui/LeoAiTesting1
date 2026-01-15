@@ -271,6 +271,7 @@ def get_live_ltp():
     """
     Fetch live LTP from Shoonya API
     Returns current market price or 0.0 if not available
+    Also stores last close price in trade_data
     """
     if not BOT_CONNECTED or api is None:
         return 0.0
@@ -284,12 +285,25 @@ def get_live_ltp():
         # Fetch live quote from Shoonya
         res = api.get_quotes(exchange='NFO', token=str(token))
         
-        if res and 'lp' in res:
-            ltp = float(res['lp'])
-            print(f"✅ Live LTP fetched: ₹{ltp:,.2f}")
-            return ltp
+        if res:
+            # Get LTP
+            ltp = float(res.get('lp', 0.0))
+            
+            # Get close price (previous day's closing)
+            close_price = float(res.get('c', 0.0)) or float(res.get('close', 0.0)) or 0.0
+            
+            # Store close price in trade_data
+            if close_price > 0:
+                trade_data["last_close"] = close_price
+            
+            if ltp > 0:
+                print(f"✅ Live LTP fetched: ₹{ltp:,.2f}, Close: ₹{close_price:,.2f}")
+                return ltp
+            else:
+                print(f"⚠️ LTP not found in response")
+                return 0.0
         else:
-            print(f"⚠️ LTP not found in response: {res}")
+            print(f"⚠️ No response from API")
             return 0.0
             
     except Exception as e:
@@ -337,7 +351,8 @@ async def get_status():
             "symbol": trade_data.get("symbol", "NIFTY FUT"),
             "entry": entry_price,
             "sl": sl_price,
-            "ltp": current_ltp  # ✅ Now showing live LTP!
+            "ltp": current_ltp,  # ✅ Now showing live LTP!
+            "close": trade_data.get("last_close", 0.0) or 0.0  # Last closing price
         },
         "tradeHistory": trade_history
     }

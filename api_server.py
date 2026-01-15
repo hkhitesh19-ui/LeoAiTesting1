@@ -10,6 +10,9 @@ app = FastAPI()
 
 
 
+
+_BOT_THREAD = None
+
 @app.api_route("/", methods=["GET","HEAD"])
 def root():
     return {"status": "ok"}
@@ -171,4 +174,20 @@ async def health_check():
 
 
 
+
+
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    print("🛑 Shutdown event triggered (Render TERM). Stopping bot safely...")
+    try:
+        import bot
+        if hasattr(bot, "stop_bot"):
+            bot.stop_bot()
+            print("✅ bot.stop_bot() called")
+        else:
+            print("⚠️ bot.stop_bot() not found")
+    except Exception as e:
+        print(f"⚠️ shutdown_event error: {e}")
 

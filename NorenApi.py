@@ -252,7 +252,7 @@ class NorenApi:
         payload = 'jData=' + json.dumps(values)
         reportmsg("Req:" + payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg("Reply:" + res.text)
 
         resDict = json.loads(res.text)
@@ -294,7 +294,7 @@ class NorenApi:
         payload = 'jData=' + json.dumps(values)
         reportmsg("Req:" + payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg("Reply:" + res.text)
 
         resDict = json.loads(res.text)
@@ -318,7 +318,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -393,7 +393,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -417,7 +417,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -446,7 +446,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -474,7 +474,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -529,7 +529,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -578,7 +578,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -603,7 +603,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         print(res.text)
 
         resDict = json.loads(res.text)
@@ -629,7 +629,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -664,7 +664,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -691,7 +691,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -717,7 +717,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -744,7 +744,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -775,7 +775,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -805,7 +805,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -831,7 +831,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -857,7 +857,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -899,7 +899,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -974,7 +974,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -1008,7 +1008,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)        
@@ -1030,7 +1030,7 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
@@ -1052,7 +1052,7 @@ class NorenApi:
         payload = 'jData=' + json.dumps(senddata,default=lambda o: o.encode())+ f'&jKey={self.__susertoken}'
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)        
@@ -1080,10 +1080,11 @@ class NorenApi:
         
         reportmsg(payload)
 
-        res = requests.post(url, data=payload)
+        res = requests.post(url, data=payload, headers={"Content-Type":"application/x-www-form-urlencoded"}, timeout=15)
         reportmsg(res.text)
 
         resDict = json.loads(res.text)        
 
         return resDict
+
 

@@ -137,3 +137,8 @@ async def get_status():
 
 
 
+
+@app.get('/health')
+@app.head('/health')
+async def health_check():
+    return {'status': 'healthy'}

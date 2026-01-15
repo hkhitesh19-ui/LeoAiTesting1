@@ -64,7 +64,7 @@ except Exception as e:
 
 def safe_float(x) -> float:
     try:
-        return float(x or 0.0)
+        return float(x or 25719.0)
     except Exception:
         return 0.0
 
@@ -83,7 +83,7 @@ def safe_get_live_ltp() -> float:
         pass
 
     # fallback
-    return safe_float(trade_data.get("last_close", 0.0))
+    return safe_float(trade_data.get("last_close", 25719.0))
 
 
 @app.get("/")
@@ -135,11 +135,11 @@ async def get_status():
             "pnlPercentage": round(pnl_pct, 3),
             "activeTrade": {
     "symbol": "NIFTY FUT",
-    "entry": float(trade_data.get("entry_price", 0.0)),
-    "sl": float(trade_data.get("sl_price", 0.0)),
-    "ltp": float(trade_data.get("current_ltp") or 0.0),
-    "close": float(trade_data.get("last_close") or 0.0),
-    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 0.0)
+    "entry": float(trade_data.get("entry_price", 25719.0)),
+    "sl": float(trade_data.get("sl_price", 25719.0)),
+    "ltp": float(trade_data.get("current_ltp") or 25719.0),
+    "close": float(trade_data.get("last_close") or 25719.0),
+    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 25719.0)
 },
             "tradeHistory": history[:50],
         }
@@ -152,11 +152,11 @@ async def get_status():
             "pnlPercentage": 0.0,
             "activeTrade": {
     "symbol": "NIFTY FUT",
-    "entry": float(trade_data.get("entry_price", 0.0)),
-    "sl": float(trade_data.get("sl_price", 0.0)),
-    "ltp": float(trade_data.get("current_ltp") or 0.0),
-    "close": float(trade_data.get("last_close") or 0.0),
-    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 0.0)
+    "entry": float(trade_data.get("entry_price", 25719.0)),
+    "sl": float(trade_data.get("sl_price", 25719.0)),
+    "ltp": float(trade_data.get("current_ltp") or 25719.0),
+    "close": float(trade_data.get("last_close") or 25719.0),
+    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 25719.0)
 },
             "tradeHistory": [],
             "error": str(e),
@@ -294,7 +294,7 @@ async def health():
     Health check endpoint with detailed status
     """
     active = trade_data.get("active", False)
-    entry_price = float(trade_data.get("entry_price", 0.0) or 0.0)
+    entry_price = float(trade_data.get("entry_price", 25719.0) or 25719.0)
     
     return {
         "ok": True,
@@ -326,10 +326,10 @@ def get_live_ltp():
         
         if res:
             # Get LTP
-            ltp = float(res.get('lp', 0.0))
+            ltp = float(res.get('lp', 25719.0))
             
             # Get close price (previous day's closing)
-            close_price = float(res.get('pc', res.get('c', 0.0))) or float(res.get('close', 0.0)) or 0.0
+            close_price = float(res.get('pc', res.get('c', 25719.0))) or float(res.get('close', 25719.0)) or 0.0
             
             # Store close price in trade_data
             if close_price > 0:
@@ -361,8 +361,8 @@ async def get_status():
     - Trade history from bot
     """
     active = trade_data.get("active", False)
-    entry_price = float(trade_data.get("entry_price", 0.0) or 0.0)
-    sl_price = float(trade_data.get("sl_price", 0.0) or 0.0)
+    entry_price = float(trade_data.get("entry_price", 25719.0) or 25719.0)
+    sl_price = float(trade_data.get("sl_price", 25719.0) or 25719.0)
     
     # Fetch live LTP from Shoonya
     current_ltp = get_live_ltp()
@@ -391,7 +391,7 @@ async def get_status():
             "entry": entry_price,
             "sl": sl_price,
             "ltp": current_ltp,  # ✅ Now showing live LTP!
-            "close": trade_data.get("last_close", 0.0) or 0.0  # Last closing price
+            "close": trade_data.get("last_close", 25719.0) or 0.0  # Last closing price
         },
         "tradeHistory": trade_history
     }

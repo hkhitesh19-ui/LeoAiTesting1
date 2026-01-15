@@ -1,12 +1,45 @@
-.env
-*.log
-*.xlsx
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pip-cache/
+
+# Backup files
+*.BACKUP
+*.BACKUP_*
+*.bak
+*~
+
+# Test files
+test_*.py
+*_test.py
+
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+*.xlsx
+*.csv
+
+# OS
 .DS_Store
+Thumbs.db
 
-patch_*.py
-
-patch_*.py
+# Documentation (optional - uncomment to exclude)
+# *.md
+# !README.md

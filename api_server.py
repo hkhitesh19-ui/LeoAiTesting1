@@ -445,5 +445,3 @@ send_telegram_alert("📊 *Daily Report*\n\nTotal P&L: ₹5,000\nTrades: 3")
 """
 
 # To run locally: uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
-=======
-        print(f"⚠️ shutdown_event error: {e}")

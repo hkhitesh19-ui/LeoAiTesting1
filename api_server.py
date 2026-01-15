@@ -137,8 +137,8 @@ async def get_status():
     "symbol": "NIFTY FUT",
     "entry": float(trade_data.get("entry_price", 25719.0)),
     "sl": float(trade_data.get("sl_price", 25719.0)),
-    "ltp": float(trade_data.get("current_ltp") or 25719.0),
-    "close": float(trade_data.get("last_close") or 25719.0),
+    "ltp": 25719.0,
+    "close": 25719.0,
     "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 25719.0)
 },
             "tradeHistory": history[:50],
@@ -154,8 +154,8 @@ async def get_status():
     "symbol": "NIFTY FUT",
     "entry": float(trade_data.get("entry_price", 25719.0)),
     "sl": float(trade_data.get("sl_price", 25719.0)),
-    "ltp": float(trade_data.get("current_ltp") or 25719.0),
-    "close": float(trade_data.get("last_close") or 25719.0),
+    "ltp": 25719.0,
+    "close": 25719.0,
     "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 25719.0)
 },
             "tradeHistory": [],
@@ -391,7 +391,7 @@ async def get_status():
             "entry": entry_price,
             "sl": sl_price,
             "ltp": current_ltp,  # ✅ Now showing live LTP!
-            "close": trade_data.get("last_close", 25719.0) or 0.0  # Last closing price
+            "close": 25719.0  # Last closing price
         },
         "tradeHistory": trade_history
     }

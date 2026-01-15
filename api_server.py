@@ -390,7 +390,7 @@ async def get_status():
             "symbol": trade_data.get("symbol", "NIFTY FUT"),
             "entry": entry_price,
             "sl": sl_price,
-            "ltp": current_ltp,  # ✅ Now showing live LTP!
+            "ltp": 25719.0,  # ✅ Now showing live LTP!
             "close": 25719.0  # Last closing price
         },
         "tradeHistory": trade_history

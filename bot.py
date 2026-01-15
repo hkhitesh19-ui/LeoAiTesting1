@@ -183,6 +183,7 @@ def get_nifty_fut_token() -> str | None:
                 trade_data["symbol"] = tsym
                 trade_data["fut_token"] = token
                 print(f"✅ FUT Selected: {tsym} | token={token}")
+            return token
 
         print("⚠️ NIFTY FUT not found in search results")
         return None
@@ -197,103 +198,94 @@ def get_nifty_fut_token() -> str | None:
 # ==============================
 def get_live_ltp() -> float:
     """
-    Live quote from Shoonya.
-    Updates trade_data current_ltp and last_close fallback.
+    Fetch live LTP for NIFTY FUT token.
+    Also maintains last_close for market closed display.
     """
     try:
         token = trade_data.get("fut_token")
         if not token:
             return 0.0
 
-        q = api.get_quotes(exchange="NFO", token=str(token))
-        if q and q.get("lp"):
-            ltp = float(q["lp"])
+        # Correct param is exchange= not exch=
+        q = api.get_quotes(exchange="NFO", token=token)
+        if not q:
+            return float(trade_data.get("current_ltp") or 0.0)
 
-            trade_data["current_ltp"] = ltp
+        lp = q.get("lp") or q.get("last_price") or q.get("ltp")
+        if lp is None:
+            return float(trade_data.get("current_ltp") or 0.0)
+
+        ltp = float(lp)
+
+        # update current ltp always
+        trade_data["current_ltp"] = ltp
+
+        # If market closed, store as last_close once
+        # (if ltp looks valid and time exists)
+        if ltp > 0:
             trade_data["last_close"] = ltp
-            trade_data["last_close_time"] = datetime.now().isoformat()
+            trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            return ltp
-        return 0.0
+        return ltp
+
     except Exception as e:
-        trade_data["last_error"] = f"LTP error: {e}"
-        return 0.0
-
-
-# ==============================
-# Main loop (scanner placeholder)
-# ==============================
-    print("=" * 50)
-
-    if not login_to_shoonya():
-        print("❌ Bot stopped: login failed")
-        return
-
-    if not get_nifty_fut_token():
-        print("❌ Bot stopped: FUT token not found")
-        return
-
-    print("✅ Bot initialization complete")
-    telegram_send("✅ *Type F Bot Ready*\nScanning NIFTY FUT LTP...")
-
-    while True:
-        try:
-            trade_data["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # LTP heartbeat
-            ltp = get_live_ltp()
-            if ltp > 0:
-                print(f"[HEARTBEAT] {trade_data['last_run']} | {trade_data['symbol']} LTP={ltp}")
-            else:
-                print(f"[WARN] {trade_data['last_run']} | LTP not available")
-
-            time.sleep(5)
-
-        except Exception as e:
-            trade_data["last_error"] = str(e)
-            print(f"❌ bot_loop error: {e}")
-            time.sleep(5)
-
-
-    print("✅ Bot thread started")
-
-
-# Auto-start when imported
-
-if __name__ == "__main__":
-    # keep alive if run directly
-    while True:
-        time.sleep(60)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        trade_data["last_error"] = f"LTP fetch error: {e}"
+        return float(trade_data.get("current_ltp") or 0.0)
 
 def start_bot_thread():
-    import threading
     t = threading.Thread(target=bot_loop, daemon=True)
     t.start()
     return t
+
+# ==============================
+# Main bot loop (auto-restored)
+# ==============================
+def bot_loop():
+    global trade_data
+
+    # ---- 1) Ensure login once ----
+    if not login_to_shoonya():
+        print("❌ bot_loop: login failed, will retry in loop")
+    else:
+        print("✅ bot_loop: login OK")
+
+    # ---- 2) Resolve NIFTY FUT token once ----
+    if not trade_data.get("fut_token"):
+        tok = get_nifty_fut_token()
+        trade_data["fut_token"] = tok
+        print("✅ FUT token:", tok)
+
+    # ---- 3) Quote updater loop ----
+    while True:
+        try:
+            tok = trade_data.get("fut_token")
+            if tok:
+                q = api.get_quotes(exchange="NFO", token=tok)
+
+                if q and q.get("lp"):
+                    ltp = float(q["lp"])
+                    trade_data["current_ltp"] = ltp
+
+                    # update last_close only if it exists
+                    if q.get("c"):
+                        trade_data["last_close"] = float(q["c"])
+                        trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                # if no live lp: keep last_close as fallback
+            time.sleep(2)
+
+        except Exception as e:
+            trade_data["last_error"] = f"Quote loop error: {e}"
+            print("⚠️ Quote loop error:", e)
+            time.sleep(5)
+        except Exception as e:
+            trade_data["last_error"] = f"bot_loop exception: {e}"
+            print("⚠️ bot_loop exception:", e)
+            time.sleep(5)
+
+
+
+
+
+
+

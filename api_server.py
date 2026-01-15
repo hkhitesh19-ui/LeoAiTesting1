@@ -7,6 +7,16 @@ from datetime import datetime
 import os
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup_event():
+    try:
+        from bot import start_bot_thread
+        start_bot_thread()
+        print("✅ Bot auto-started on API startup")
+    except Exception as e:
+        print("⚠️ Bot auto-start failed:", e)
 
 # CORS for Netlify frontend
 app.add_middleware(
@@ -115,11 +125,13 @@ async def get_status():
             "todayPnl": round(today_pnl, 2),
             "pnlPercentage": round(pnl_pct, 3),
             "activeTrade": {
-                "symbol": trade_data.get("symbol", "NIFTY FUT"),
-                "entry": entry,
-                "sl": sl,
-                "ltp": round(ltp_val, 2),
-            },
+    "symbol": "NIFTY FUT",
+    "entry": float(trade_data.get("entry_price", 0.0)),
+    "sl": float(trade_data.get("sl_price", 0.0)),
+    "ltp": float(trade_data.get("current_ltp") or 0.0),
+    "close": float(trade_data.get("last_close") or 0.0),
+    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 0.0)
+},
             "tradeHistory": history[:50],
         }
 
@@ -129,7 +141,14 @@ async def get_status():
             "botStatus": {"status": "Error", "message": "API error"},
             "todayPnl": 0.0,
             "pnlPercentage": 0.0,
-            "activeTrade": {"symbol": "NIFTY FUT", "entry": 0.0, "sl": 0.0, "ltp": 0.0},
+            "activeTrade": {
+    "symbol": "NIFTY FUT",
+    "entry": float(trade_data.get("entry_price", 0.0)),
+    "sl": float(trade_data.get("sl_price", 0.0)),
+    "ltp": float(trade_data.get("current_ltp") or 0.0),
+    "close": float(trade_data.get("last_close") or 0.0),
+    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 0.0)
+},
             "tradeHistory": [],
             "error": str(e),
         }
@@ -142,3 +161,8 @@ async def get_status():
 @app.head('/health')
 async def health_check():
     return {'status': 'healthy'}
+
+
+
+
+

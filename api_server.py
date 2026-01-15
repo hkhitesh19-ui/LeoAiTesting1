@@ -329,7 +329,7 @@ def get_live_ltp():
             ltp = float(res.get('lp', 0.0))
             
             # Get close price (previous day's closing)
-            close_price = float(res.get('c', 0.0)) or float(res.get('close', 0.0)) or 0.0
+            close_price = float(res.get('pc', res.get('c', 0.0))) or float(res.get('close', 0.0)) or 0.0
             
             # Store close price in trade_data
             if close_price > 0:

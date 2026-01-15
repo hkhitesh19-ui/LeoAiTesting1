@@ -1,4 +1,4 @@
-﻿"""
+"""
 Type F Trading Strategy Bot (Render-ready)
 - Handles Shoonya login
 - Finds NIFTY current month future token
@@ -277,7 +277,7 @@ def bot_loop():
 
                     # update last_close only if it exists
                     if q.get("c"):
-                        trade_data["last_close"] = float(q["c"])
+                        trade_data["last_close"] = float(q.get("pc", q.get("c", 0)))
                         trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 # if no live lp: keep last_close as fallback

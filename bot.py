@@ -21,6 +21,8 @@ from NorenApi import NorenApi
 # ==============================
 # Shared runtime state
 # ==============================
+_BOT_THREAD_STARTED = False
+
 trade_data = {
     "active": False,
 
@@ -233,6 +235,12 @@ def get_live_ltp() -> float:
         return float(trade_data.get("current_ltp") or 0.0)
 
 def start_bot_thread():
+    global _BOT_THREAD_STARTED
+    if _BOT_THREAD_STARTED:
+        print("ℹ️ Bot thread already started, skipping.")
+        return None
+    _BOT_THREAD_STARTED = True
+
     t = threading.Thread(target=bot_loop, daemon=True)
     t.start()
     return t
@@ -282,6 +290,7 @@ def bot_loop():
             trade_data["last_error"] = f"bot_loop exception: {e}"
             print("⚠️ bot_loop exception:", e)
             time.sleep(5)
+
 
 
 

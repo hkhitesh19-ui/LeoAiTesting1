@@ -22,6 +22,7 @@ from NorenApi import NorenApi
 # Shared runtime state
 # ==============================
 _BOT_THREAD_STARTED = False
+_STOP_BOT = False
 
 trade_data = {
     "active": False,
@@ -264,7 +265,7 @@ def bot_loop():
         print("✅ FUT token:", tok)
 
     # ---- 3) Quote updater loop ----
-    while True:
+    while not _STOP_BOT:
         try:
             tok = trade_data.get("fut_token")
             if tok:
@@ -298,3 +299,10 @@ def bot_loop():
 
 
 
+
+
+
+def stop_bot():
+    global _STOP_BOT
+    _STOP_BOT = True
+    print("🛑 stop_bot(): stop flag set True")

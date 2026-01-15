@@ -1,4 +1,4 @@
-﻿import json
+import json
 import requests
 import threading
 import websocket
@@ -256,8 +256,8 @@ class NorenApi:
         reportmsg("Reply:" + res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
         
         self.__username   = userid
         self.__accountid  = userid
@@ -299,8 +299,8 @@ class NorenApi:
 
         resDict = json.loads(res.text)
         
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
         
         return resDict
 
@@ -322,8 +322,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         self.__username   = None
         self.__accountid  = None
@@ -397,8 +397,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -421,8 +421,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -450,8 +450,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -478,8 +478,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -533,8 +533,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -582,8 +582,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -607,8 +607,8 @@ class NorenApi:
         print(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -633,8 +633,8 @@ class NorenApi:
         reportmsg(res.text)
 
         resDict = json.loads(res.text)
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -669,8 +669,8 @@ class NorenApi:
 
         resDict = json.loads(res.text)
         
-        if resDict['stat'] != 'Ok':
-            return resDict
+        if resDict['stat'] != 'Ok':            
+            return None
 
         return resDict
 
@@ -780,8 +780,8 @@ class NorenApi:
 
         resDict = json.loads(res.text)
 
-        if resDict['stat'] != 'Ok':
-            return resDict        
+        if resDict['stat'] != 'Ok':            
+            return None        
 
         return resDict
 
@@ -810,8 +810,8 @@ class NorenApi:
 
         resDict = json.loads(res.text)
 
-        if resDict['stat'] != 'Ok':
-            return resDict        
+        if resDict['stat'] != 'Ok':            
+            return None        
 
         return resDict
 
@@ -836,8 +836,8 @@ class NorenApi:
 
         resDict = json.loads(res.text)
 
-        if resDict['stat'] != 'Ok':
-            return resDict        
+        if resDict['stat'] != 'Ok':            
+            return None        
 
         return resDict
 
@@ -862,8 +862,8 @@ class NorenApi:
 
         resDict = json.loads(res.text)
 
-        if resDict['stat'] != 'Ok':
-            return resDict        
+        if resDict['stat'] != 'Ok':            
+            return None        
 
         return resDict
 
@@ -1086,4 +1086,3 @@ class NorenApi:
         resDict = json.loads(res.text)        
 
         return resDict
-

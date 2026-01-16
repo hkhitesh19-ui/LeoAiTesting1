@@ -43,3 +43,5 @@ Thumbs.db
 # Documentation (optional - uncomment to exclude)
 # *.md
 # !README.md
+patch_*.py
+schemas.py

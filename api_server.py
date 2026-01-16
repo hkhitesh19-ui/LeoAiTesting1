@@ -752,3 +752,17 @@ def get_status_strict(response: Response):
 
 
 
+
+# === HARDEN_VERSION_ENDPOINT ===
+import os
+from datetime import datetime
+
+@app.get("/version")
+def version():
+    return {
+        "render_git_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
+        "git_commit": os.getenv("GIT_COMMIT", "unknown"),
+        "server_time": datetime.now().isoformat()
+    }
+# === HARDEN_VERSION_ENDPOINT_END ===
+

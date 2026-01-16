@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-from dotenv import load_dotenv
+﻿from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
@@ -14,7 +13,6 @@ app = FastAPI()
 
 
 _BOT_THREAD = None
-=======
 ﻿
 def _build_time_ist() -> str:
     # Store build time at process start (stable across requests)
@@ -82,10 +80,10 @@ class GetStatusResponse(BaseModel):
 
 
 app = FastAPI()
-
+
+
 
 _BOT_THREAD = None
->>>>>>> f9ea538 (Hardening: strict /get_status + disable old handler)
 
 @app.api_route("/", methods=["GET","HEAD"])
 def root():
@@ -100,7 +98,6 @@ async def startup_event():
     except Exception as e:
         print("⚠️ Bot auto-start failed:", e)
 
-<<<<<<< HEAD
 # CORS for Netlify frontend
 app.add_middleware(
     CORSMiddleware,
@@ -207,7 +204,6 @@ async def get_status():
             },
             "todayPnl": round(today_pnl, 2),
             "pnlPercentage": round(pnl_pct, 3),
-=======
 # CORS for Netlify frontend
 app.add_middleware(
     CORSMiddleware,
@@ -283,7 +279,7 @@ async def health():
     }
 
 
-# @app.get("/get_status", response_model=GetStatusResponse)  # DISABLED (replaced by strict hardened endpoint)
+# # @app.get("/get_status", response_model=GetStatusResponse)  # DISABLED: replaced by strict hardened handler  # DISABLED (replaced by strict hardened endpoint)
 async def get_status():
     """
     Frontend dashboard endpoint
@@ -314,7 +310,6 @@ async def get_status():
             },
             "todayPnl": round(today_pnl, 2),
             "pnlPercentage": round(pnl_pct, 3),
->>>>>>> f9ea538 (Hardening: strict /get_status + disable old handler)
             "activeTrade": {
     "symbol": "NIFTY FUT",
     "entry": float(trade_data.get("entry_price", 25719.0)),
@@ -372,7 +367,6 @@ def shutdown_event():
         else:
             print("⚠️ bot.stop_bot() not found")
     except Exception as e:
-<<<<<<< HEAD
         print(f"❌ Error in stop_bot: {e}")
 
 def send_trade_entry_alert(symbol, price, sl, strategy="Type F"):
@@ -628,7 +622,6 @@ send_telegram_alert("📊 *Daily Report*\n\nTotal P&L: ₹5,000\nTrades: 3")
 """
 
 # To run locally: uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
-=======
         print(f"⚠️ shutdown_event error: {e}")
 
 # === HARDEN_GET_STATUS_BEGIN ===
@@ -758,4 +751,4 @@ def get_status_strict(response: Response):
 # === HARDEN_GET_STATUS_END ===
 
 
->>>>>>> f9ea538 (Hardening: strict /get_status + disable old handler)
+

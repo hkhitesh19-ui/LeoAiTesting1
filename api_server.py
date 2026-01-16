@@ -13,7 +13,7 @@ app = FastAPI()
 
 
 _BOT_THREAD = None
-﻿
+
 def _build_time_ist() -> str:
     # Store build time at process start (stable across requests)
     # fallback to current time if env not set
@@ -765,4 +765,5 @@ def version():
         "server_time": datetime.now().isoformat()
     }
 # === HARDEN_VERSION_ENDPOINT_END ===
+
 

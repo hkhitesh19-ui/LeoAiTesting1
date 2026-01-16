@@ -168,7 +168,12 @@ def get_status_strict(response: Response):
     """
     STRICT JSON. Always returns same schema.
     """
+    global trade_data
+    trade_data = normalize_trade_data(trade_data)
+
     response.headers["Cache-Control"] = "no-store"
+    global trade_data
+    trade_data = normalize_trade_data(trade_data)
 
     active = bool(trade_data.get("active", False))
 
@@ -226,8 +231,38 @@ def get_status_strict(response: Response):
             ltp=safe_float(trade_data.get("ltp")),
             close=close_val,
             display_ltp=display_val,
+            close_date=datetime.now().strftime("%d-%b-%Y"),
+            close_time=datetime.now().strftime("%H:%M:%S"),
         ),
         tradeHistory=trade_history,
     )
 
     return payload
+
+
+# ===============================
+# HARDEN: trade_data key mapper
+# ===============================
+def normalize_trade_data(td: dict) -> dict:
+    if not isinstance(td, dict):
+        return {}
+
+    if "entry_price" not in td and "entry" in td:
+        td["entry_price"] = td.get("entry")
+    if "sl_price" not in td and "sl" in td:
+        td["sl_price"] = td.get("sl")
+
+    if "ltp" not in td or td.get("ltp") is None:
+        td["ltp"] = td.get("display_ltp") or td.get("last_ltp") or 0.0
+
+    if "close" not in td or td.get("close") is None:
+        td["close"] = td.get("last_close") or td.get("close_price") or 0.0
+
+    if "display_ltp" not in td or float(td.get("display_ltp") or 0) == 0.0:
+        td["display_ltp"] = td.get("ltp") or td.get("close") or 0.0
+
+    if not td.get("symbol"):
+        td["symbol"] = "NIFTY FUT"
+
+    return td
+

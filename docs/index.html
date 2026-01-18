@@ -175,6 +175,16 @@
       .card{ grid-column: span 12; }
       .value{ font-size:28px; }
     }
+
+    /* ✅ Heartbeat pulse */
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.55; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .dot.pulse {
+      animation: pulse 1.2s infinite;
+    }
   </style>
 </head>
 
@@ -183,11 +193,12 @@
     <div class="topbar">
       <div class="brand">
         <h1>TypeF Algo Trading Dashboard</h1>
-        <div class="sub">Shoonya Bot + Render Backend + Netlify UI</div>
+        <div class="sub">Shoonya Bot + Render Backend + GitHub Pages UI</div>
       </div>
 
       <div class="pillrow">
         <div class="pill"><span class="dot" id="dotBot"></span> Bot: <span id="botAlive">--</span></div>
+        <div class="pill"><span class="dot" id="dotBeat"></span> Heartbeat: <span id="hb">--</span></div>
         <div class="pill">Version: <span id="ver">--</span></div>
         <div class="pill">Server: <span id="srvTime">--</span></div>
       </div>
@@ -212,7 +223,6 @@
         <div class="subline" id="ltpMeta">--</div>
       </div>
 
-      <!-- ✅ NEW: Last Close Card -->
       <div class="card">
         <div class="label">Last Close</div>
         <div class="value" id="lastCloseValue">₹0.00</div>
@@ -254,6 +264,9 @@
     const API_URL = "https://leoaitesting1.onrender.com/get_status";
     const VERSION_URL = "https://leoaitesting1.onrender.com/version";
 
+    // Heartbeat tracking
+    let lastOkTs = 0;
+
     // =========================================================
     // UI helpers
     // =========================================================
@@ -276,6 +289,21 @@
       }
     }
 
+    function setHeartbeatLive(){
+      lastOkTs = Date.now();
+      document.getElementById("hb").textContent = "LIVE";
+      const beatDot = document.getElementById("dotBeat");
+      beatDot.classList.remove("bad");
+      beatDot.classList.add("ok", "pulse");
+    }
+
+    function setHeartbeatDown(){
+      document.getElementById("hb").textContent = "DOWN";
+      const beatDot = document.getElementById("dotBeat");
+      beatDot.classList.remove("ok", "pulse");
+      beatDot.classList.add("bad");
+    }
+
     // =========================================================
     // Fetch functions (cache bust ✅)
     // =========================================================
@@ -295,6 +323,9 @@
 
         // status
         const data = await fetchJSON(API_URL);
+
+        // heartbeat ok
+        setHeartbeatLive();
 
         // bot connected
         const botConnected = !!data.bot_connected;
@@ -316,7 +347,7 @@
         document.getElementById("ltp").textContent = money(ltp);
         document.getElementById("displayPrice").textContent = money(disp);
 
-        // ✅ Last Close card
+        // Last Close card
         const lastCloseDate = data.last_close_date || "";
         const lastCloseTime = data.last_close_time || "";
         document.getElementById("lastCloseValue").textContent = money(close);
@@ -343,6 +374,7 @@
         setDot(false);
         document.getElementById("botAlive").textContent = "Error";
         document.getElementById("raw").textContent = "ERROR: " + err;
+        setHeartbeatDown();
       }
     }
 
@@ -361,6 +393,25 @@
     // Auto refresh
     refresh();
     setInterval(refresh, 3000);
+
+    // Heartbeat stale check (updates every second)
+    setInterval(() => {
+      if (!lastOkTs) return;
+
+      const diff = Math.floor((Date.now() - lastOkTs) / 1000);
+      const hb = document.getElementById("hb");
+      const beatDot = document.getElementById("dotBeat");
+
+      if (diff <= 6) {
+        hb.textContent = "LIVE (" + diff + "s)";
+        beatDot.classList.remove("bad");
+        beatDot.classList.add("ok", "pulse");
+      } else {
+        hb.textContent = "STALE (" + diff + "s)";
+        beatDot.classList.remove("ok", "pulse");
+        beatDot.classList.add("bad");
+      }
+    }, 1000);
   </script>
 </body>
 </html>

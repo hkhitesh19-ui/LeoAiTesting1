@@ -8,6 +8,13 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from bot import start_bot_thread
+
+@app.on_event("startup")
+def startup_event():
+    start_bot_thread()
+
+
 # ==========================================================
 # App
 # ==========================================================
@@ -252,4 +259,13 @@ def get_status_strict(response: Response):
         tradeHistory=trade_history,
     )
     return payload
+
+@app.get("/bot_thread")
+def bot_thread():
+    try:
+        from bot import _bot_thread
+        return {"thread_alive": bool(_bot_thread and _bot_thread.is_alive())}
+    except Exception as e:
+        return {"thread_alive": False, "error": str(e)}
+
 

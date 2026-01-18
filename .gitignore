@@ -47,3 +47,5 @@ patch_*.py
 schemas.py
 
 close_store.py
+
+deploy_ui.ps1

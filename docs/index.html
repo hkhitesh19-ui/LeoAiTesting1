@@ -1,0 +1,366 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TypeF Trading Dashboard</title>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#101a33;
+      --card2:#0e1730;
+      --text:#e7eefc;
+      --muted:#9fb1d1;
+      --border:#203055;
+      --green:#2ecc71;
+      --red:#ff4d4d;
+      --yellow:#ffcc00;
+      --blue:#4da3ff;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica;
+      background: radial-gradient(1200px 600px at 10% 0%, #14224a 0%, var(--bg) 50%, #070b14 100%);
+      color:var(--text);
+    }
+
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:24px 14px 60px;
+    }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+
+    .brand h1{
+      margin:0;
+      font-size:22px;
+      letter-spacing:0.2px;
+    }
+
+    .brand .sub{
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .pillrow{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+    }
+
+    .pill{
+      border:1px solid var(--border);
+      background:rgba(16,26,51,.8);
+      padding:8px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+
+    .dot{
+      width:9px;height:9px;border-radius:50%;
+      background:var(--yellow);
+    }
+
+    .dot.ok{ background:var(--green); }
+    .dot.bad{ background:var(--red); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:12px;
+      margin-top:12px;
+    }
+
+    .card{
+      grid-column: span 4;
+      background: linear-gradient(180deg, rgba(16,26,51,.95), rgba(14,23,48,.95));
+      border:1px solid rgba(32,48,85,.9);
+      border-radius:18px;
+      padding:14px 14px 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.25);
+      min-height:96px;
+    }
+
+    .label{
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:.4px;
+      text-transform:uppercase;
+    }
+
+    .value{
+      margin-top:8px;
+      font-size:30px;
+      font-weight:800;
+      letter-spacing:0.2px;
+    }
+
+    .subline{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .wide{
+      grid-column: span 12;
+      min-height:auto;
+    }
+
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .small{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .btn{
+      border:1px solid var(--border);
+      background:rgba(16,26,51,.9);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:600;
+    }
+    .btn:hover{ border-color:#35508b; }
+
+    .code{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      color:#cfe0ff;
+      background:rgba(0,0,0,.25);
+      border:1px solid rgba(32,48,85,.9);
+      padding:10px 12px;
+      border-radius:12px;
+      overflow:auto;
+      max-height:260px;
+      white-space:pre-wrap;
+    }
+
+    /* responsive */
+    @media (max-width: 900px){
+      .card{ grid-column: span 6; }
+    }
+    @media (max-width: 560px){
+      .card{ grid-column: span 12; }
+      .value{ font-size:28px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <h1>TypeF Algo Trading Dashboard</h1>
+        <div class="sub">Shoonya Bot + Render Backend + Netlify UI</div>
+      </div>
+
+      <div class="pillrow">
+        <div class="pill"><span class="dot" id="dotBot"></span> Bot: <span id="botAlive">--</span></div>
+        <div class="pill">Version: <span id="ver">--</span></div>
+        <div class="pill">Server: <span id="srvTime">--</span></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="label">Symbol</div>
+        <div class="value" id="symbol">--</div>
+        <div class="subline" id="statusLine">--</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Display Price</div>
+        <div class="value" id="displayPrice">₹0.00</div>
+        <div class="subline">Fallback: LTP (market open) / Close (market closed)</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Live LTP</div>
+        <div class="value" id="ltp">₹0.00</div>
+        <div class="subline" id="ltpMeta">--</div>
+      </div>
+
+      <!-- ✅ NEW: Last Close Card -->
+      <div class="card">
+        <div class="label">Last Close</div>
+        <div class="value" id="lastCloseValue">₹0.00</div>
+        <div class="subline" id="lastCloseMeta">--</div>
+      </div>
+
+      <div class="card">
+        <div class="label">PnL (Today)</div>
+        <div class="value" id="pnl">₹0.00</div>
+        <div class="subline" id="pnlPct">0.00%</div>
+      </div>
+
+      <div class="card">
+        <div class="label">Bot Connected</div>
+        <div class="value" id="botConnected">--</div>
+        <div class="subline">Strict API schema protected</div>
+      </div>
+
+      <div class="card wide">
+        <div class="row">
+          <div>
+            <div class="label">Raw API Response</div>
+            <div class="small">Auto refresh every 3 seconds (cache-busted)</div>
+          </div>
+          <div class="row">
+            <button class="btn" id="btnRefresh">Refresh Now</button>
+            <button class="btn" id="btnCopy">Copy JSON</button>
+          </div>
+        </div>
+        <div class="code" id="raw">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================
+    // CONFIG
+    // =========================================================
+    const API_URL = "https://leoaitesting1.onrender.com/get_status";
+    const VERSION_URL = "https://leoaitesting1.onrender.com/version";
+
+    // =========================================================
+    // UI helpers
+    // =========================================================
+    function money(x){
+      const n = Number(x || 0);
+      return "₹" + n.toFixed(2);
+    }
+
+    function setDot(ok){
+      const dot = document.getElementById("dotBot");
+      dot.classList.remove("ok","bad");
+      dot.classList.add(ok ? "ok" : "bad");
+    }
+
+    function safeGet(obj, path, defVal){
+      try{
+        return path.split(".").reduce((a,c)=>a && a[c], obj) ?? defVal;
+      }catch(e){
+        return defVal;
+      }
+    }
+
+    // =========================================================
+    // Fetch functions (cache bust ✅)
+    // =========================================================
+    async function fetchJSON(url){
+      const u = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+      const res = await fetch(u, { cache: "no-store" });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      return await res.json();
+    }
+
+    async function refresh(){
+      try{
+        // version
+        const ver = await fetchJSON(VERSION_URL);
+        document.getElementById("ver").textContent = (ver.render_git_commit || "").slice(0,7) || "--";
+        document.getElementById("srvTime").textContent = ver.server_time ? new Date(ver.server_time).toLocaleString() : "--";
+
+        // status
+        const data = await fetchJSON(API_URL);
+
+        // bot connected
+        const botConnected = !!data.bot_connected;
+        document.getElementById("botConnected").textContent = botConnected ? "YES" : "NO";
+
+        // status line
+        const st = safeGet(data, "botStatus.status", "--");
+        const msg = safeGet(data, "botStatus.message", "--");
+        document.getElementById("statusLine").textContent = st + " / " + msg;
+
+        // symbol
+        document.getElementById("symbol").textContent = safeGet(data, "activeTrade.symbol", "--");
+
+        // prices
+        const ltp = safeGet(data, "activeTrade.ltp", 0);
+        const close = safeGet(data, "activeTrade.close", 0);
+        const disp = safeGet(data, "activeTrade.display_ltp", 0);
+
+        document.getElementById("ltp").textContent = money(ltp);
+        document.getElementById("displayPrice").textContent = money(disp);
+
+        // ✅ Last Close card
+        const lastCloseDate = data.last_close_date || "";
+        const lastCloseTime = data.last_close_time || "";
+        document.getElementById("lastCloseValue").textContent = money(close);
+        document.getElementById("lastCloseMeta").textContent =
+          (lastCloseDate ? lastCloseDate : "--") + (lastCloseTime ? (" " + lastCloseTime) : "");
+
+        // ltp meta
+        document.getElementById("ltpMeta").textContent = "Close: " + money(close);
+
+        // pnl
+        const pnl = safeGet(data, "todayPnl", 0);
+        const pct = safeGet(data, "pnlPercentage", 0);
+        document.getElementById("pnl").textContent = money(pnl);
+        document.getElementById("pnlPct").textContent = Number(pct || 0).toFixed(2) + "%";
+
+        // bot alive indicator
+        setDot(botConnected);
+        document.getElementById("botAlive").textContent = botConnected ? "Connected" : "Disconnected";
+
+        // raw json
+        document.getElementById("raw").textContent = JSON.stringify(data, null, 2);
+
+      }catch(err){
+        setDot(false);
+        document.getElementById("botAlive").textContent = "Error";
+        document.getElementById("raw").textContent = "ERROR: " + err;
+      }
+    }
+
+    // Buttons
+    document.getElementById("btnRefresh").addEventListener("click", refresh);
+    document.getElementById("btnCopy").addEventListener("click", async () => {
+      try{
+        const txt = document.getElementById("raw").textContent;
+        await navigator.clipboard.writeText(txt);
+        alert("Copied ✅");
+      }catch(e){
+        alert("Copy failed");
+      }
+    });
+
+    // Auto refresh
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+</html>

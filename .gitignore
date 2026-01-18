@@ -45,3 +45,5 @@ Thumbs.db
 # !README.md
 patch_*.py
 schemas.py
+
+close_store.py

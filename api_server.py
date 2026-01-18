@@ -44,10 +44,6 @@ trade_data: Dict[str, Any] = {
     "trade_history": [],
 }
 
-bot_status: Dict[str, str] = {"status": "Searching", "message": "Scanning"}
-today_pnl: float = 0.0
-pnl_percentage: float = 0.0
-
 # ==========================================================
 # Try importing bot.py (optional)
 # ==========================================================
@@ -83,21 +79,39 @@ def safe_str(x: Any) -> str:
         return ""
 
 
-def safe_get_live_ltp() -> float:
+def normalize_trade_data(td: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Prefer live LTP if bot is updating it.
-    Falls back to close when market closed.
+    Compatibility layer: supports old/new bot key names.
+    Does NOT mutate global trade_data (caller should pass dict(trade_data)).
     """
-    # expected keys from bot: ltp, close, display_ltp
-    ltp = safe_float(trade_data.get("ltp"))
-    close = safe_float(trade_data.get("close"))
-    display_ltp = safe_float(trade_data.get("display_ltp"))
+    if not isinstance(td, dict):
+        return {}
 
-    if display_ltp > 0:
-        return display_ltp
-    if ltp > 0:
-        return ltp
-    return close
+    # entry / sl
+    if "entry_price" not in td and "entry" in td:
+        td["entry_price"] = td.get("entry")
+    if "sl_price" not in td and "sl" in td:
+        td["sl_price"] = td.get("sl")
+
+    # ltp / close
+    if "ltp" not in td or td.get("ltp") is None:
+        td["ltp"] = td.get("display_ltp") or td.get("last_ltp") or 0.0
+
+    if "close" not in td or td.get("close") is None:
+        td["close"] = td.get("last_close") or td.get("close_price") or 0.0
+
+    # display_ltp fallback
+    try:
+        if "display_ltp" not in td or float(td.get("display_ltp") or 0) == 0.0:
+            td["display_ltp"] = td.get("ltp") or td.get("close") or 0.0
+    except Exception:
+        td["display_ltp"] = td.get("ltp") or td.get("close") or 0.0
+
+    # symbol fallback
+    if not td.get("symbol"):
+        td["symbol"] = "NIFTY FUT"
+
+    return td
 
 
 # ==========================================================
@@ -134,6 +148,11 @@ class StatusResponse(BaseModel):
     botStatus: BotStatusModel = Field(default_factory=BotStatusModel)
     todayPnl: float = 0.0
     pnlPercentage: float = 0.0
+
+    # last close meta
+    last_close_date: str = ""
+    last_close_time: str = ""
+
     activeTrade: ActiveTradeModel = Field(default_factory=ActiveTradeModel)
     tradeHistory: List[TradeHistoryModel] = Field(default_factory=list)
 
@@ -168,33 +187,30 @@ def get_status_strict(response: Response):
     """
     STRICT JSON. Always returns same schema.
     """
-    global trade_data
-    trade_data = normalize_trade_data(trade_data)
-
     response.headers["Cache-Control"] = "no-store"
-    global trade_data
-    trade_data = normalize_trade_data(trade_data)
 
-    active = bool(trade_data.get("active", False))
+    td = normalize_trade_data(dict(trade_data))
 
-    entry = safe_float(trade_data.get("entry_price"))
-    sl = safe_float(trade_data.get("sl_price"))
-    ltp_val = safe_get_live_ltp()
+    active = bool(td.get("active", False))
 
-    close_val = safe_float(trade_data.get("close"))
-    display_val = safe_float(trade_data.get("display_ltp"))
+    entry = safe_float(td.get("entry_price"))
+    sl = safe_float(td.get("sl_price"))
+
+    ltp_val = safe_float(td.get("ltp"))
+    close_val = safe_float(td.get("close"))
+    display_val = safe_float(td.get("display_ltp"))
     if display_val == 0.0:
         display_val = ltp_val if ltp_val > 0 else close_val
 
     # pnl calc (basic)
-    _today_pnl = 0.0
-    _pnl_pct = 0.0
-    if active and entry > 0 and ltp_val > 0:
-        _today_pnl = ltp_val - entry
-        _pnl_pct = ((_today_pnl) / entry) * 100.0
+    today_pnl = 0.0
+    pnl_pct = 0.0
+    if active and entry > 0 and display_val > 0:
+        today_pnl = display_val - entry
+        pnl_pct = (today_pnl / entry) * 100.0
 
     # history normalization
-    history = trade_data.get("trade_history") or []
+    history = td.get("trade_history") or []
     if not isinstance(history, list):
         history = []
 
@@ -212,7 +228,6 @@ def get_status_strict(response: Response):
                 )
             )
 
-    # bot status
     status_text = "Active" if active else "Searching"
     msg_text = "Market Open" if active else "Scanning"
 
@@ -222,47 +237,18 @@ def get_status_strict(response: Response):
         server_time=datetime.now().isoformat(),
         bot_connected=BOT_CONNECTED,
         botStatus=BotStatusModel(status=status_text, message=msg_text),
-        todayPnl=round(_today_pnl, 2),
-        pnlPercentage=round(_pnl_pct, 3),
+        todayPnl=round(today_pnl, 2),
+        pnlPercentage=round(pnl_pct, 3),
+        last_close_date=datetime.now().strftime("%d-%b-%Y"),
+        last_close_time=datetime.now().strftime("%H:%M:%S"),
         activeTrade=ActiveTradeModel(
-            symbol=safe_str(trade_data.get("symbol", "NIFTY FUT")) or "NIFTY FUT",
+            symbol=safe_str(td.get("symbol")) or "NIFTY FUT",
             entry=entry,
             sl=sl,
-            ltp=safe_float(trade_data.get("ltp")),
+            ltp=ltp_val,
             close=close_val,
             display_ltp=display_val,
-            close_date=datetime.now().strftime("%d-%b-%Y"),
-            close_time=datetime.now().strftime("%H:%M:%S"),
         ),
         tradeHistory=trade_history,
     )
-
     return payload
-
-
-# ===============================
-# HARDEN: trade_data key mapper
-# ===============================
-def normalize_trade_data(td: dict) -> dict:
-    if not isinstance(td, dict):
-        return {}
-
-    if "entry_price" not in td and "entry" in td:
-        td["entry_price"] = td.get("entry")
-    if "sl_price" not in td and "sl" in td:
-        td["sl_price"] = td.get("sl")
-
-    if "ltp" not in td or td.get("ltp") is None:
-        td["ltp"] = td.get("display_ltp") or td.get("last_ltp") or 0.0
-
-    if "close" not in td or td.get("close") is None:
-        td["close"] = td.get("last_close") or td.get("close_price") or 0.0
-
-    if "display_ltp" not in td or float(td.get("display_ltp") or 0) == 0.0:
-        td["display_ltp"] = td.get("ltp") or td.get("close") or 0.0
-
-    if not td.get("symbol"):
-        td["symbol"] = "NIFTY FUT"
-
-    return td
-

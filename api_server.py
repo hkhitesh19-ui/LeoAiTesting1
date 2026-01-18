@@ -252,8 +252,20 @@ def get_status_strict(response: Response):
                 )
             )
 
-    status_text = "Active" if active else "Searching"
-    msg_text = "Market Open" if active else "Scanning"
+    # Better bot status (accurate)
+bot_runtime_status = safe_str(td.get("status"))  # from bot.py ("Running", "LoginOK", etc.)
+
+if active:
+    status_text = "Active"
+    msg_text = "Market Open"
+else:
+    if BOT_CONNECTED:
+        status_text = bot_runtime_status or "Running"
+        msg_text = "Bot OK"
+    else:
+        status_text = "Disconnected"
+        msg_text = "Bot Not Connected"
+
 
     payload = StatusResponse(
         version=(BUILD_COMMIT[:7] if BUILD_COMMIT else "local"),

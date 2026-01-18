@@ -1,35 +1,33 @@
 """
-Type F Trading Strategy Bot (Render-ready)
-- Handles Shoonya login
-- Finds NIFTY current month future token
-- Provides LIVE LTP
-- Keeps last_close LTP for after-market display
-- NO dynamic pip install
-- NO circular import
+TypeF Shoonya Bot (Production Clean)
+- Render safe
+- Starts via FastAPI startup -> start_bot_thread()
+- Stable Shoonya login (TOTP)
+- Selects current month NIFTY FUT token
+- Updates trade_data with current_ltp + last_close (for market closed display)
 """
+
+from __future__ import annotations
 
 import os
 import time
 import threading
 from datetime import datetime
-import pyotp
+from typing import Any, Dict, Optional
 
-# REQUIRED dependency (must be in requirements.txt)
+import pyotp
 from NorenApi import NorenApi
 
-
-# ==============================
-# Shared runtime state
-# ==============================
-_BOT_THREAD_STARTED = False
-_STOP_BOT = False
-
-trade_data = {
+# ==========================================================
+# Shared runtime state (imported by api_server.py)
+# ==========================================================
+trade_data: Dict[str, Any] = {
     "active": False,
 
-    # status/meta
+    # meta/status
     "last_run": None,
     "last_error": None,
+    "status": "Booting",
 
     # instrument
     "symbol": "NIFTY FUT",
@@ -41,7 +39,7 @@ trade_data = {
     "target_price": 0.0,
     "entry_time": None,
 
-    # ltp and fallback close
+    # prices
     "current_ltp": 0.0,
     "last_close": 0.0,
     "last_close_time": None,
@@ -50,10 +48,16 @@ trade_data = {
     "trade_history": [],
 }
 
+# ==========================================================
+# Thread state
+# ==========================================================
+_bot_thread: Optional[threading.Thread] = None
+_stop_flag = False
 
-# ==============================
-# Shoonya API wrapper
-# ==============================
+
+# ==========================================================
+# Shoonya wrapper
+# ==========================================================
 class ShoonyaApiPy(NorenApi):
     def __init__(self):
         super().__init__(
@@ -65,65 +69,60 @@ class ShoonyaApiPy(NorenApi):
 api = ShoonyaApiPy()
 
 
-# ==============================
-# ENV VARS (Render)
-# ==============================
+# ==========================================================
+# ENV
+# ==========================================================
 UID = os.getenv("SHOONYA_USERID")
 PWD = os.getenv("SHOONYA_PASSWORD")
+
+# Some repos use different names; support both
 APP_KEY = os.getenv("SHOONYA_API_SECRET") or os.getenv("APP_KEY") or ""
-VENDOR_CODE = os.getenv("SHOONYA_VENDOR_CODE") or os.getenv("VENDOR_CODE") or "NA"
-vendor_code= os.getenv("VENDOR_CODE") or os.getenv("SHOONYA_VENDOR_CODE", "NA")
-api_secret= os.getenv("APP_KEY") or os.getenv("SHOONYA_API_SECRET", "")
-IMEI = os.getenv("IMEI") or os.getenv("SHOONYA_IMEI", "abc1234")
+VENDOR_CODE = os.getenv("SHOONYA_VENDOR_CODE") or os.getenv("VENDOR_CODE") or ""
+IMEI = os.getenv("SHOONYA_IMEI") or os.getenv("IMEI") or "abc1234"
 
-
-# Shoonya TOTP Secret (base32)
 TOTP_KEY = os.getenv("TOTP_SECRET")
 
 
-# ==============================
-# Helper: Telegram send (NO polling)
-# ==============================
+# ==========================================================
+# Telegram push-only (optional)
+# ==========================================================
 def telegram_send(message: str):
-    """
-    Send telegram alert (push-only). No polling.
-    """
     try:
         import requests
+
         token = os.getenv("TELEGRAM_TOKEN")
         chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
         if not token or not chat_id:
             return
 
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+        payload = {"chat_id": chat_id, "text": message}
         requests.post(url, json=payload, timeout=10)
     except Exception:
         pass
 
 
-# ==============================
+# ==========================================================
 # Login
-# ==============================
+# ==========================================================
 def login_to_shoonya() -> bool:
     try:
         if not UID or not PWD or not TOTP_KEY:
-            trade_data["last_error"] = "Missing UID/PWD/TOTP_KEY"
-            print("❌ Missing SHOONYA_USERID / SHOONYA_PASSWORD / TOTP_SECRET env vars")
+            trade_data["last_error"] = "Missing env vars: SHOONYA_USERID/SHOONYA_PASSWORD/TOTP_SECRET"
+            print("❌ Missing env: SHOONYA_USERID / SHOONYA_PASSWORD / TOTP_SECRET")
             return False
 
         key = TOTP_KEY.strip().replace(" ", "").upper()
 
-        # must be base32 only
+        # validate base32 (A-Z2-7)
         for ch in key:
             if ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567":
-                trade_data["last_error"] = "TOTP_KEY invalid format"
-                print("❌ Invalid TOTP_KEY (must be base32 A-Z2-7)")
+                trade_data["last_error"] = "TOTP_SECRET invalid base32 format"
+                print("❌ Invalid TOTP_SECRET format (must be base32 A-Z2-7)")
                 return False
 
         totp_code = pyotp.TOTP(key).now()
-        print(f"🔐 Logging in to Shoonya with UID: {UID}")
+        print(f"🔐 Shoonya login start UID={UID}")
 
         ret = api.login(
             userid=UID,
@@ -134,36 +133,32 @@ def login_to_shoonya() -> bool:
             imei=IMEI,
         )
 
-        print("DEBUG LOGIN RET:", ret)
-
-
-
         if ret and ret.get("stat") == "Ok":
             trade_data["last_error"] = None
             print("✅ Shoonya login OK")
-            telegram_send("🟢 *Type F Bot Online*\nShoonya login successful ✅")
+            telegram_send("🟢 TypeF Bot: Shoonya login OK")
             return True
 
         err = ret.get("emsg", "Unknown error") if ret else "No response"
         trade_data["last_error"] = f"Login failed: {err}"
         print(f"❌ Shoonya login failed: {err}")
-        telegram_send(f"🔴 *Shoonya Login Failed*\n{err}")
+        telegram_send(f"🔴 TypeF Bot: Login failed\n{err}")
         return False
 
     except Exception as e:
         trade_data["last_error"] = f"Login exception: {e}"
-        print(f"❌ Login exception: {e}")
-        telegram_send(f"🔴 *Login Exception*\n{e}")
+        print(f"❌ Shoonya login exception: {e}")
+        telegram_send(f"🔴 TypeF Bot: Login exception\n{e}")
         return False
 
 
-# ==============================
-# Token fetch
-# ==============================
-def get_nifty_fut_token() -> str | None:
+# ==========================================================
+# Token fetch (fixed return bug)
+# ==========================================================
+def get_nifty_fut_token() -> Optional[str]:
     """
-    Find current month NIFTY FUT token. Prefer symbols like:
-    NIFTY27JAN26F, NIFTY28FEB26F etc.
+    Find current month NIFTY FUT token.
+    Symbols example: NIFTY27JAN26F, NIFTY28FEB26F
     """
     try:
         ret = api.searchscrip(exchange="NFO", searchtext="NIFTY")
@@ -171,24 +166,25 @@ def get_nifty_fut_token() -> str | None:
             print("❌ searchscrip failed (no values)")
             return None
 
+        # Prefer first FUT ending with F and not options
         for s in ret["values"]:
-            tsym = (s.get("tsym") or "").upper()
+            tsym = s.get("tsym", "") or s.get("symbol", "") or ""
             token = s.get("token")
 
-            # strict filters
             if not tsym.startswith("NIFTY"):
                 continue
-            if "BANK" in tsym or "FIN" in tsym or "MID" in tsym or "NXT50" in tsym:
+            if any(x in tsym for x in ["BANK", "FIN", "MID", "NXT50"]):
                 continue
             if "CE" in tsym or "PE" in tsym:
                 continue
-            if tsym.endswith("F"):  # Futures usually end with F
+
+            if tsym.endswith("F"):
                 trade_data["symbol"] = tsym
                 trade_data["fut_token"] = token
                 print(f"✅ FUT Selected: {tsym} | token={token}")
-            return token
+                return token  # ✅ correct return inside loop
 
-        print("⚠️ NIFTY FUT not found in search results")
+        print("⚠️ NIFTY FUT not found")
         return None
 
     except Exception as e:
@@ -196,113 +192,136 @@ def get_nifty_fut_token() -> str | None:
         return None
 
 
-# ==============================
-# LTP fetch
-# ==============================
-def get_live_ltp() -> float:
-    """
-    Fetch live LTP for NIFTY FUT token.
-    Also maintains last_close for market closed display.
-    """
+# ==========================================================
+# Quote fetch
+# ==========================================================
+def _safe_float(x: Any) -> float:
     try:
-        token = trade_data.get("fut_token")
-        if not token:
+        if x is None:
             return 0.0
+        return float(x)
+    except Exception:
+        return 0.0
 
-        # Correct param is exchange= not exch=
-        q = api.get_quotes(exchange="NFO", token=token)
-        if not q:
-            return float(trade_data.get("current_ltp") or 0.0)
 
-        lp = q.get("lp") or q.get("last_price") or q.get("ltp")
-        if lp is None:
-            return float(trade_data.get("current_ltp") or 0.0)
+def fetch_quote_prices() -> Dict[str, float]:
+    """
+    Returns {"ltp":..., "close":...}
+    - ltp: lp/ltp/last_price
+    - close: close price if available else ltp fallback
+    """
+    token = trade_data.get("fut_token")
+    if not token:
+        return {"ltp": 0.0, "close": 0.0}
 
-        ltp = float(lp)
+    q = api.get_quotes(exchange="NFO", token=token)  # correct arg exchange=
+    if not q:
+        return {"ltp": 0.0, "close": 0.0}
 
-        # update current ltp always
-        trade_data["current_ltp"] = ltp
+    ltp = q.get("lp") or q.get("ltp") or q.get("last_price")
+    close = (
+        q.get("c")
+        or q.get("close")
+        or q.get("close_price")
+        or q.get("prev_close")
+        or q.get("pc")
+    )
 
-        # If market closed, store as last_close once
-        # (if ltp looks valid and time exists)
-        if ltp > 0:
-            trade_data["last_close"] = float(q.get("pc", q.get("c", ltp)))
-            trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ltp_f = _safe_float(ltp)
+    close_f = _safe_float(close)
+    if close_f <= 0:
+        close_f = ltp_f
 
-        return ltp
+    return {"ltp": ltp_f, "close": close_f}
 
-    except Exception as e:
-        trade_data["last_error"] = f"LTP fetch error: {e}"
-        return float(trade_data.get("current_ltp") or 0.0)
 
-def start_bot_thread():
-    global _BOT_THREAD_STARTED
-    if _BOT_THREAD_STARTED:
-        print("ℹ️ Bot thread already started, skipping.")
-        return None
-    _BOT_THREAD_STARTED = True
-
-    t = threading.Thread(target=bot_loop, daemon=True)
-    t.start()
-    return t
-
-# ==============================
-# Main bot loop (auto-restored)
-# ==============================
+# ==========================================================
+# Bot loop
+# ==========================================================
 def bot_loop():
-    global trade_data
+    global _stop_flag
 
-    # ---- 1) Ensure login once ----
-    if not login_to_shoonya():
-        print("❌ bot_loop: login failed, will retry in loop")
-    else:
-        print("✅ bot_loop: login OK")
+    print("✅ BOT LOOP STARTED")
+    trade_data["status"] = "Starting"
 
-    # ---- 2) Resolve NIFTY FUT token once ----
-    if not trade_data.get("fut_token"):
-        tok = get_nifty_fut_token()
-        trade_data["fut_token"] = tok
-        print("✅ FUT token:", tok)
+    # login retry loop
+    while not _stop_flag:
+        ok = login_to_shoonya()
+        if ok:
+            break
+        trade_data["status"] = "LoginFailed"
+        time.sleep(5)
 
-    # ---- 3) Quote updater loop ----
-    while not _STOP_BOT:
+    if _stop_flag:
+        return
+
+    trade_data["status"] = "LoginOK"
+
+    # token selection retry
+    while not _stop_flag:
+        token = get_nifty_fut_token()
+        if token:
+            break
+        trade_data["status"] = "TokenNotFound"
+        time.sleep(5)
+
+    if _stop_flag:
+        return
+
+    trade_data["status"] = "Running"
+
+    # main loop
+    last_log_ts = 0.0
+    while not _stop_flag:
         try:
-            tok = trade_data.get("fut_token")
-            if tok:
-                q = api.get_quotes(exchange="NFO", token=tok)
+            trade_data["last_run"] = datetime.now().isoformat()
 
-                if q and q.get("lp"):
-                    ltp = float(q.get("lp", q.get("pc", 0)))
-                    trade_data["current_ltp"] = ltp
+            prices = fetch_quote_prices()
+            ltp = prices["ltp"]
+            close = prices["close"]
 
-                    # update last_close only if it exists
-                    if q.get("c"):
-                        trade_data["last_close"] = float(q.get("pc", q.get("c", 0)))
-                        trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # update state
+            if ltp > 0:
+                trade_data["current_ltp"] = ltp
 
-                # if no live lp: keep last_close as fallback
+            if close > 0:
+                trade_data["last_close"] = close
+                trade_data["last_close_time"] = datetime.now().strftime("%H:%M:%S")
+
+            # reduce log spam
+            now = time.time()
+            if now - last_log_ts > 20:
+                last_log_ts = now
+                print(
+                    f"✅ Prices | {trade_data.get('symbol')} "
+                    f"ltp={trade_data.get('current_ltp')} close={trade_data.get('last_close')}"
+                )
+
             time.sleep(2)
 
         except Exception as e:
-            trade_data["last_error"] = f"Quote loop error: {e}"
-            print("⚠️ Quote loop error:", e)
-            time.sleep(5)
-        except Exception as e:
-            trade_data["last_error"] = f"bot_loop exception: {e}"
-            print("⚠️ bot_loop exception:", e)
+            trade_data["last_error"] = str(e)
+            trade_data["status"] = "Error"
+            print(f"❌ bot_loop error: {e}")
             time.sleep(5)
 
 
+# ==========================================================
+# Thread start/stop
+# ==========================================================
+def start_bot_thread():
+    global _bot_thread, _stop_flag
+    if _bot_thread and _bot_thread.is_alive():
+        print("✅ Bot thread already alive")
+        return
 
-
-
-
-
-
-
+    _stop_flag = False
+    _bot_thread = threading.Thread(target=bot_loop, daemon=True)
+    _bot_thread.start()
+    print("✅ Bot thread started")
 
 
 def stop_bot():
-    global _STOP_BOT
-    _STOP_BOT = True
-    print("🛑 stop_bot(): stop flag set True")
+    global _stop_flag
+    _stop_flag = True
+    print("⚠️ Bot stop requested")

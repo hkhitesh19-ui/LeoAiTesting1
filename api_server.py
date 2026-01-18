@@ -95,7 +95,7 @@ def normalize_trade_data(td: Dict[str, Any]) -> Dict[str, Any]:
 
     # ltp / close
     if "ltp" not in td or td.get("ltp") is None:
-        td["ltp"] = td.get("display_ltp") or td.get("last_ltp") or 0.0
+        td["ltp"] = td.get("current_ltp") or td.get("display_ltp") or td.get("last_ltp") or 0.0
 
     if "close" not in td or td.get("close") is None:
         td["close"] = td.get("last_close") or td.get("close_price") or 0.0
@@ -103,9 +103,9 @@ def normalize_trade_data(td: Dict[str, Any]) -> Dict[str, Any]:
     # display_ltp fallback
     try:
         if "display_ltp" not in td or float(td.get("display_ltp") or 0) == 0.0:
-            td["display_ltp"] = td.get("ltp") or td.get("close") or 0.0
+            td["display_ltp"] = td.get("current_ltp") or td.get("ltp") or td.get("close") or 0.0
     except Exception:
-        td["display_ltp"] = td.get("ltp") or td.get("close") or 0.0
+        td["display_ltp"] = td.get("current_ltp") or td.get("ltp") or td.get("close") or 0.0
 
     # symbol fallback
     if not td.get("symbol"):
@@ -252,3 +252,4 @@ def get_status_strict(response: Response):
         tradeHistory=trade_history,
     )
     return payload
+

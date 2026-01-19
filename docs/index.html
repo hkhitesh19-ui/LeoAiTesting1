@@ -428,13 +428,14 @@ setInterval(() => {
   }
   const age = Date.now() - lastSuccessTs;
   if(age > STALE_MS){
-    setHeartbeat("STALE", Last success s ago);
+    setHeartbeat("STALE", `Last success ${((Date.now()-lastSuccessTs)/1000).toFixed(1)}s ago`);
   }else{
-    setHeartbeat("LIVE", Last success s ago);
+    setHeartbeat("LIVE", `Last success ${((Date.now()-lastSuccessTs)/1000).toFixed(1)}s ago`);
   }
 }, 1000);
 </script>
 
 </body>
 </html>
+
 

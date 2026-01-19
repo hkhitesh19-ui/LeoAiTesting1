@@ -51,3 +51,5 @@ close_store.py
 deploy_ui.ps1
 
 deploy_ui.ps1
+
+prepush_check.ps1

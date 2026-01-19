@@ -435,7 +435,61 @@ setInterval(() => {
 }, 1000);
 </script>
 
+<script>
+/* ===== HEARTBEAT_PINGER (independent) ===== */
+(function(){
+  let lastOk = 0;
+  const STALE_MS = 15000;
+
+  function setHB(state, msg){
+    try{
+      const pill=document.getElementById("heartbeat-pill");
+      const text=document.getElementById("heartbeat-text");
+      if(!pill || !text) return;
+
+      pill.classList.remove("hb-live","hb-stale","hb-down");
+
+      if(state==="LIVE"){
+        pill.classList.add("hb-live");
+        text.textContent="LIVE";
+      }else if(state==="STALE"){
+        pill.classList.add("hb-stale");
+        text.textContent="STALE";
+      }else{
+        pill.classList.add("hb-down");
+        text.textContent="DOWN";
+      }
+
+      if(msg) pill.title=msg;
+    }catch(e){}
+  }
+
+  async function ping(){
+    try{
+      const r = await fetch(API_BASE + "/health?t=" + Date.now(), {cache:"no-store"});
+      if(!r.ok) throw new Error("health not ok");
+      lastOk = Date.now();
+      setHB("LIVE","Health OK: " + new Date(lastOk).toLocaleString());
+    }catch(e){
+      setHB("DOWN","API ping failed");
+    }
+  }
+
+  setInterval(() => {
+    if(!lastOk){ setHB("DOWN","Waiting for first ping..."); return; }
+    const age = Date.now() - lastOk;
+    if(age > STALE_MS) setHB("STALE","Last OK " + (age/1000).toFixed(1) + "s ago");
+    else setHB("LIVE","Last OK " + (age/1000).toFixed(1) + "s ago");
+  }, 1000);
+
+  // ping every 3 sec
+  setInterval(ping, 3000);
+  ping();
+})();
+</script>
+
 </body>
 </html>
+
 
 

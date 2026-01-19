@@ -175,7 +175,32 @@
       .card{ grid-column: span 12; }
       .value{ font-size:28px; }
     }
-  </style>
+  .hb-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 12px;
+  border-radius:999px;
+  font-weight:700;
+  font-size:12px;
+  letter-spacing:0.4px;
+  border:1px solid rgba(255,255,255,0.12);
+  user-select:none;
+}
+.hb-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  box-shadow:0 0 0 3px rgba(255,255,255,0.08);
+}
+.hb-live{ background: rgba(0,255,140,0.12); }
+.hb-live .hb-dot{ background:#00ff8c; }
+.hb-stale{ background: rgba(255,190,0,0.14); }
+.hb-stale .hb-dot{ background:#ffbe00; }
+.hb-down{ background: rgba(255,80,80,0.14); }
+.hb-down .hb-dot{ background:#ff5050; }
+
+</style>
 </head>
 
 <body>
@@ -187,7 +212,11 @@
       </div>
 
       <div class="pillrow">
-        <div class="pill"><span class="dot" id="dotBot"></span> Bot: <span id="botAlive">--</span></div>
+        
+        <div id="heartbeat-pill" class="pill hb-pill hb-down" title="Waiting for first successful fetch...">
+          <span id="heartbeat-dot" class="hb-dot"></span>
+          <span id="heartbeat-text">DOWN</span>
+        </div><div class="pill"><span class="dot" id="dotBot"></span> Bot: <span id="botAlive">--</span></div>
         <div class="pill">Version: <span id="ver">--</span></div>
         <div class="pill">Server: <span id="srvTime">--</span></div>
       </div>
@@ -335,6 +364,8 @@
         // bot alive indicator
         setDot(botConnected);
         document.getElementById("botAlive").textContent = botConnected ? "Connected" : "Disconnected";
+lastSuccessTs = Date.now();
+setHeartbeat('LIVE','Last success: '+new Date(lastSuccessTs).toLocaleString());
 
         // raw json
         document.getElementById("raw").textContent = JSON.stringify(data, null, 2);
@@ -342,6 +373,8 @@
       }catch(err){
         setDot(false);
         document.getElementById("botAlive").textContent = "Error";
+lastSuccessTs = Date.now();
+setHeartbeat('LIVE','Last success: '+new Date(lastSuccessTs).toLocaleString());
         document.getElementById("raw").textContent = "ERROR: " + err;
       }
     }
@@ -362,5 +395,46 @@
     refresh();
     setInterval(refresh, 3000);
   </script>
+<script>
+/* ===== HEARTBEAT ===== */
+let lastSuccessTs = 0;
+const STALE_MS = 15000;
+
+function setHeartbeat(state, titleText){
+  const pill = document.getElementById("heartbeat-pill");
+  const text = document.getElementById("heartbeat-text");
+  if(!pill || !text) return;
+
+  pill.classList.remove("hb-live","hb-stale","hb-down");
+
+  if(state === "LIVE"){
+    pill.classList.add("hb-live");
+    text.textContent = "LIVE";
+  }else if(state === "STALE"){
+    pill.classList.add("hb-stale");
+    text.textContent = "STALE";
+  }else{
+    pill.classList.add("hb-down");
+    text.textContent = "DOWN";
+  }
+
+  if(titleText) pill.title = titleText;
+}
+
+setInterval(() => {
+  if(!lastSuccessTs){
+    setHeartbeat("DOWN", "Waiting for first successful fetch...");
+    return;
+  }
+  const age = Date.now() - lastSuccessTs;
+  if(age > STALE_MS){
+    setHeartbeat("STALE", Last success s ago);
+  }else{
+    setHeartbeat("LIVE", Last success s ago);
+  }
+}, 1000);
+</script>
+
 </body>
 </html>
+

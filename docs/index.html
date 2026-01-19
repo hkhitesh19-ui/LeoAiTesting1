@@ -396,111 +396,65 @@ setHeartbeat('LIVE','Last success: '+new Date(lastSuccessTs).toLocaleString());
     setInterval(refresh, 3000);
   </script>
 <script>
-/* ===== HEARTBEAT ===== */
-let lastSuccessTs = 0;
-const STALE_MS = 20000; const DOWN_MS = 60000;
-
-function setHeartbeat(state, titleText){
-  const pill = document.getElementById("heartbeat-pill");
-  const text = document.getElementById("heartbeat-text");
-  if(!pill || !text) return;
-
-  pill.classList.remove("hb-live","hb-stale","hb-down");
-
-  if(state === "LIVE"){
-    pill.classList.add("hb-live");
-    text.textContent = "LIVE";
-  }else if(state === "STALE"){
-    pill.classList.add("hb-stale");
-    text.textContent = "STALE";
-  }else{
-    pill.classList.add("hb-down");
-    text.textContent = "DOWN";
-  }
-
-  if(titleText) pill.title = titleText;
-}
-
-setInterval(() => {
-  if(!lastSuccessTs){
-    setHeartbeat("DOWN", "Waiting for first successful fetch...");
-    return;
-  }
-  const age = Date.now() - lastSuccessTs;
-  if(age > STALE_MS){
-    setHeartbeat("STALE", `Last success ${((Date.now()-lastSuccessTs)/1000).toFixed(1)}s ago`);
-  }else{
-    setHeartbeat("LIVE", `Last success ${((Date.now()-lastSuccessTs)/1000).toFixed(1)}s ago`);
-  }
-}, 1000);
-</script>
-
-<script>
-/* ===== HEARTBEAT_PINGER (independent) ===== */
+/* ===== HEARTBEAT_SINGLE (stable) ===== */
 (function(){
-  let lastOk = 0; let failCount = 0; const FAIL_LIMIT = 3; const STALE_MS = 20000; const DOWN_MS = 60000;
+  let lastOk = 0;
+  const STALE_MS = 20000; // 20 sec
+  const DOWN_MS  = 60000; // 60 sec
 
   function setHB(state, msg){
-    try{
-      const pill=document.getElementById("heartbeat-pill");
-      const text=document.getElementById("heartbeat-text");
-      if(!pill || !text) return;
+    const pill=document.getElementById("heartbeat-pill");
+    const text=document.getElementById("heartbeat-text");
+    if(!pill || !text) return;
 
-      pill.classList.remove("hb-live","hb-stale","hb-down");
+    pill.classList.remove("hb-live","hb-stale","hb-down");
 
-      if(state==="LIVE"){
-        pill.classList.add("hb-live");
-        text.textContent="LIVE";
-      }else if(state==="STALE"){
-        pill.classList.add("hb-stale");
-        text.textContent="STALE";
-      }else{
-        pill.classList.add("hb-down");
-        text.textContent="DOWN";
-      }
-
-      if(msg) pill.title=msg;
-    }catch(e){}
+    if(state==="LIVE"){
+      pill.classList.add("hb-live"); text.textContent="LIVE";
+    }else if(state==="STALE"){
+      pill.classList.add("hb-stale"); text.textContent="STALE";
+    }else{
+      pill.classList.add("hb-down"); text.textContent="DOWN";
+    }
+    if(msg) pill.title=msg;
   }
 
   async function ping(){
     try{
       const r = await fetch(API_BASE + "/health?t=" + Date.now(), {cache:"no-store"});
-      if(!r.ok) throw new Error("health not ok");
+      if(!r.ok) throw new Error("bad");
       lastOk = Date.now();
-failCount = 0;
-setHB("LIVE","Health OK: " + new Date(lastOk).toLocaleString());
-}catch(e){
-  failCount++;
-  if(failCount >= FAIL_LIMIT){
-    setHB("DOWN","API ping failed (" + failCount + ")");
-  }else{
-    // temporary failure -> show STALE instead of DOWN
-    setHB("STALE","Ping retry " + failCount + "/" + FAIL_LIMIT);
-  }
-}
+    }catch(e){
+      // do nothing - state decided by lastOk age
+    }
   }
 
-  setInterval(() => {
-    if(!lastOk){ setHB("DOWN","Waiting for first ping..."); return; }
-    const age = Date.now() - lastOk;
-    if(age > DOWN_MS){
-  setHB("DOWN","Last OK " + (age/1000).toFixed(1) + "s ago");
-}else if(age > STALE_MS){
-  setHB("STALE","Last OK " + (age/1000).toFixed(1) + "s ago");
-}else{
-  setHB("LIVE","Last OK " + (age/1000).toFixed(1) + "s ago");
-}
-  }, 1000);
-
-  // ping every 3 sec
-  setInterval(ping, 3000);
+  // ping every 5 sec (less load)
+  setInterval(ping, 5000);
   ping();
+
+  // UI update every 1 sec
+  setInterval(()=>{
+    if(!lastOk){
+      setHB("DOWN","Waiting for first success ping...");
+      return;
+    }
+    const age = Date.now()-lastOk;
+
+    if(age > DOWN_MS){
+      setHB("DOWN","Last OK "+(age/1000).toFixed(1)+"s ago");
+    }else if(age > STALE_MS){
+      setHB("STALE","Last OK "+(age/1000).toFixed(1)+"s ago");
+    }else{
+      setHB("LIVE","Last OK "+(age/1000).toFixed(1)+"s ago");
+    }
+  }, 1000);
 })();
 </script>
 
 </body>
 </html>
+
 
 
 

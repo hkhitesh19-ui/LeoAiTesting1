@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import os
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -13,7 +14,7 @@ from pydantic import BaseModel, Field
 # ==========================================================
 app = FastAPI(title="TypeF API", version="1.0.0")
 
-# CORS (Netlify)
+# CORS (GitHub Pages UI / any static site)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,21 +30,46 @@ BUILD_COMMIT = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "loc
 BUILD_TIME = os.getenv("BUILD_TIME") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # ==========================================================
-# Runtime state
+# Import bot (optional)
 # ==========================================================
 BOT_CONNECTED = False
+bot = None
 
-# Default strict shape (UI never breaks)
+# Safe fallback trade_data if bot not imported
 trade_data: Dict[str, Any] = {
     "active": False,
+    "last_run": None,
+    "last_error": None,
+    "status": "Booting",
+
     "symbol": "NIFTY FUT",
+    "fut_token": None,
+
     "entry_price": 0.0,
     "sl_price": 0.0,
-    "ltp": 0.0,
-    "close": 0.0,
-    "display_ltp": 0.0,
+    "target_price": 0.0,
+    "entry_time": None,
+
+    "current_ltp": 0.0,
+    "last_close": 0.0,
+    "last_close_time": None,
+
     "trade_history": [],
 }
+
+try:
+    import bot as bot_module  # noqa
+
+    bot = bot_module
+    if hasattr(bot_module, "trade_data") and isinstance(bot_module.trade_data, dict):
+        trade_data = bot_module.trade_data
+        BOT_CONNECTED = True
+        print("✅ bot.py connected: trade_data imported")
+    else:
+        print("⚠️ bot.py imported but trade_data missing/invalid")
+except Exception as e:
+    BOT_CONNECTED = False
+    print(f"⚠️ bot import failed: {e}")
 
 # ==========================================================
 # Helpers
@@ -66,39 +92,29 @@ def safe_str(x: Any) -> str:
 
 def normalize_trade_data(td: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Compatibility layer: supports old/new bot key names.
-    Does NOT mutate global trade_data (caller should pass dict(trade_data)).
+    Compatibility layer for different bot versions:
+    - ltp = current_ltp
+    - close = last_close
+    - display_ltp fallback
     """
     if not isinstance(td, dict):
         return {}
 
-    # entry / sl
-    if "entry_price" not in td and "entry" in td:
-        td["entry_price"] = td.get("entry")
-    if "sl_price" not in td and "sl" in td:
-        td["sl_price"] = td.get("sl")
-
-    # ltp / close mapping
+    # Normalize keys
     if "ltp" not in td or td.get("ltp") is None:
-        td["ltp"] = td.get("current_ltp") or td.get("display_ltp") or td.get("last_ltp") or 0.0
+        td["ltp"] = td.get("current_ltp") or 0.0
 
     if "close" not in td or td.get("close") is None:
-        td["close"] = td.get("last_close") or td.get("close_price") or 0.0
+        td["close"] = td.get("last_close") or 0.0
 
     # display_ltp fallback
-    try:
-        if "display_ltp" not in td or float(td.get("display_ltp") or 0.0) == 0.0:
-            td["display_ltp"] = td.get("current_ltp") or td.get("ltp") or td.get("close") or 0.0
-    except Exception:
+    disp = safe_float(td.get("display_ltp"))
+    if disp == 0.0:
         td["display_ltp"] = td.get("current_ltp") or td.get("ltp") or td.get("close") or 0.0
 
-    # symbol fallback
+    # defaults
     if not td.get("symbol"):
         td["symbol"] = "NIFTY FUT"
-
-    # history fallback
-    if "trade_history" not in td or not isinstance(td.get("trade_history"), list):
-        td["trade_history"] = []
 
     return td
 
@@ -138,7 +154,6 @@ class StatusResponse(BaseModel):
     todayPnl: float = 0.0
     pnlPercentage: float = 0.0
 
-    # last close meta
     last_close_date: str = ""
     last_close_time: str = ""
 
@@ -147,37 +162,37 @@ class StatusResponse(BaseModel):
 
 
 # ==========================================================
-# Bot import + Startup (Correct order)
+# Bot thread auto-start (safe)
 # ==========================================================
-try:
-    import bot  # noqa
+def start_bot_thread_safe():
+    """
+    Starts bot thread if available and not already started.
+    Will NOT crash API if bot not present.
+    """
+    try:
+        if not bot:
+            return
 
-    if hasattr(bot, "trade_data") and isinstance(bot.trade_data, dict):
-        trade_data = bot.trade_data
-        BOT_CONNECTED = True
-        print("✅ bot.py connected: trade_data imported")
-    else:
-        BOT_CONNECTED = False
-        print("⚠️ bot.py imported but trade_data missing/invalid")
-except Exception as e:
-    BOT_CONNECTED = False
-    print(f"⚠️ bot import failed: {e}")
+        if hasattr(bot, "start_bot_thread"):
+            bot.start_bot_thread()
+            print("✅ Bot thread start called from FastAPI startup")
+            return
+
+        # fallback: if bot has internal loop method
+        if hasattr(bot, "bot_loop"):
+            # create thread only if missing
+            if not hasattr(bot, "_bot_thread") or not getattr(bot, "_bot_thread"):
+                th = threading.Thread(target=bot.bot_loop, daemon=True)
+                setattr(bot, "_bot_thread", th)
+                th.start()
+                print("✅ Bot thread started (fallback)")
+    except Exception as e:
+        print(f"⚠️ start_bot_thread_safe error: {e}")
 
 
 @app.on_event("startup")
-def startup_event():
-    """
-    Start bot thread on API startup.
-    This is REQUIRED on Render because bot.py isn't executed as __main__.
-    """
-    try:
-        if "bot" in globals() and hasattr(bot, "start_bot_thread"):
-            bot.start_bot_thread()
-            print("✅ Bot thread start called from FastAPI startup")
-        else:
-            print("⚠️ bot.start_bot_thread not found")
-    except Exception as e:
-        print(f"❌ Startup bot thread error: {e}")
+def on_startup():
+    start_bot_thread_safe()
 
 
 # ==========================================================
@@ -185,7 +200,7 @@ def startup_event():
 # ==========================================================
 @app.get("/", tags=["system"])
 def root():
-    return {"ok": True, "service": "TypeF API", "commit": (BUILD_COMMIT[:7] if BUILD_COMMIT else "local")}
+    return {"ok": True, "service": "TypeF API", "commit": BUILD_COMMIT[:7]}
 
 
 @app.api_route("/health", methods=["GET", "HEAD"], tags=["system"])
@@ -205,35 +220,61 @@ def version():
     }
 
 
+@app.get("/bot_thread", tags=["debug"])
+def bot_thread():
+    try:
+        if not bot:
+            return {"thread_alive": False, "error": "bot not imported"}
+
+        if hasattr(bot, "_bot_thread"):
+            th = getattr(bot, "_bot_thread")
+            alive = bool(th and th.is_alive())
+            return {"thread_alive": alive}
+
+        return {"thread_alive": False, "error": "bot._bot_thread not found"}
+    except Exception as e:
+        return {"thread_alive": False, "error": str(e)}
+
+
+@app.get("/debug_trade_data", tags=["debug"])
+def debug_trade_data():
+    try:
+        if not bot:
+            return {"ok": False, "error": "bot not imported"}
+        if not hasattr(bot, "trade_data"):
+            return {"ok": False, "error": "bot.trade_data not found"}
+        return {"ok": True, "trade_data": bot.trade_data}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @app.get("/get_status", response_model=StatusResponse, tags=["dashboard"])
 def get_status_strict(response: Response):
     """
-    STRICT JSON. Always returns same schema.
+    STRICT JSON contract always same.
     """
     response.headers["Cache-Control"] = "no-store"
 
     td = normalize_trade_data(dict(trade_data))
 
+    # status
+    bot_runtime_status = safe_str(td.get("status")) or ""
     active = bool(td.get("active", False))
 
+    # prices
     entry = safe_float(td.get("entry_price"))
     sl = safe_float(td.get("sl_price"))
-
     ltp_val = safe_float(td.get("ltp"))
     close_val = safe_float(td.get("close"))
     display_val = safe_float(td.get("display_ltp"))
-
     if display_val == 0.0:
         display_val = ltp_val if ltp_val > 0 else close_val
 
-    # pnl (basic)
+    # pnl placeholders
     today_pnl = 0.0
     pnl_pct = 0.0
-    if active and entry > 0 and display_val > 0:
-        today_pnl = display_val - entry
-        pnl_pct = (today_pnl / entry) * 100.0
 
-    # history
+    # history normalization
     history = td.get("trade_history") or []
     if not isinstance(history, list):
         history = []
@@ -252,20 +293,17 @@ def get_status_strict(response: Response):
                 )
             )
 
-    # Better bot status (accurate)
-bot_runtime_status = safe_str(td.get("status"))  # from bot.py ("Running", "LoginOK", etc.)
-
-if active:
-    status_text = "Active"
-    msg_text = "Market Open"
-else:
-    if BOT_CONNECTED:
-        status_text = bot_runtime_status or "Running"
-        msg_text = "Bot OK"
+    # bot status text (accurate)
+    if active:
+        status_text = "Active"
+        msg_text = "Market Open"
     else:
-        status_text = "Disconnected"
-        msg_text = "Bot Not Connected"
-
+        if BOT_CONNECTED:
+            status_text = bot_runtime_status or "Running"
+            msg_text = "Bot OK"
+        else:
+            status_text = "Disconnected"
+            msg_text = "Bot Not Connected"
 
     payload = StatusResponse(
         version=(BUILD_COMMIT[:7] if BUILD_COMMIT else "local"),
@@ -288,39 +326,3 @@ else:
         tradeHistory=trade_history,
     )
     return payload
-
-
-@app.get("/bot_thread", tags=["debug"])
-def bot_thread():
-    """
-    Check if bot thread is alive (Render debug).
-    """
-    try:
-        if "bot" not in globals():
-            return {"thread_alive": False, "error": "bot not imported"}
-
-        if hasattr(bot, "_bot_thread"):
-            th = getattr(bot, "_bot_thread")
-            alive = bool(th and th.is_alive())
-            return {"thread_alive": alive}
-
-        return {"thread_alive": False, "error": "bot._bot_thread not found"}
-    except Exception as e:
-        return {"thread_alive": False, "error": str(e)}
-
-
-@app.get("/debug_trade_data", tags=["debug"])
-def debug_trade_data():
-    """
-    Return raw bot.trade_data for debugging values (ltp/close etc.)
-    """
-    try:
-        if "bot" not in globals():
-            return {"ok": False, "error": "bot not imported"}
-
-        if hasattr(bot, "trade_data") and isinstance(bot.trade_data, dict):
-            return {"ok": True, "trade_data": bot.trade_data}
-
-        return {"ok": False, "error": "bot.trade_data missing/invalid"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}

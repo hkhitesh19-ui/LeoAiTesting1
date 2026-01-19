@@ -438,8 +438,7 @@ setInterval(() => {
 <script>
 /* ===== HEARTBEAT_PINGER (independent) ===== */
 (function(){
-  let lastOk = 0;
-  const STALE_MS = 15000;
+  let lastOk = 0; let failCount = 0; const FAIL_LIMIT = 3; const STALE_MS = 20000;
 
   function setHB(state, msg){
     try{
@@ -469,10 +468,17 @@ setInterval(() => {
       const r = await fetch(API_BASE + "/health?t=" + Date.now(), {cache:"no-store"});
       if(!r.ok) throw new Error("health not ok");
       lastOk = Date.now();
-      setHB("LIVE","Health OK: " + new Date(lastOk).toLocaleString());
-    }catch(e){
-      setHB("DOWN","API ping failed");
-    }
+failCount = 0;
+setHB("LIVE","Health OK: " + new Date(lastOk).toLocaleString());
+}catch(e){
+  failCount++;
+  if(failCount >= FAIL_LIMIT){
+    setHB("DOWN","API ping failed (" + failCount + ")");
+  }else{
+    // temporary failure -> show STALE instead of DOWN
+    setHB("STALE","Ping retry " + failCount + "/" + FAIL_LIMIT);
+  }
+}
   }
 
   setInterval(() => {
@@ -490,6 +496,7 @@ setInterval(() => {
 
 </body>
 </html>
+
 
 
 

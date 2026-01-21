@@ -83,7 +83,13 @@ function ParseJsonSafe($text){
 }
 
 function ToDateTimeSafe($s){
-  try { return [datetime]::Parse($s) } catch { return $null }
+  try {
+    return ([datetimeoffset]::Parse($s)).UtcDateTime
+  } catch {
+    return $null
+  }
+}
+
 }
 
 # ====== RECOVERY CALLS ======
@@ -193,7 +199,8 @@ if($RECOVERY_ENABLED -and (-not $DRY_RUN)){
 
     $isStale = $false
     if($serverTime){
-      $age = (New-TimeSpan -Start $serverTime -End (Get-Date)).TotalSeconds
+     $age = (New-TimeSpan -Start $serverTime -End ([datetime]::UtcNow)).TotalSeconds
+
       if($age -gt $STALE_SECONDS){ $isStale = $true }
     }else{
       Warn "server_time parse failed -> treat as stale"

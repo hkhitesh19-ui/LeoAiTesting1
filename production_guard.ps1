@@ -1,23 +1,22 @@
 ﻿# ============================
-# TypeF Production Guard v4
+# TypeF Production Guard v5
 # ============================
-# FULL REWRITE (stable, minimal, institutional)
+# FULL REWRITE (Institutional)
 #
-# Features:
-# - Backup critical files
-# - Checks: /health /version /get_status
-# - Level-1: restart bot thread
-# - Level-2: restart service
-# - SAFE stale detection:
-#     * Uses backend server_time if parseable
-#     * Otherwise falls back to /version server_time
-#     * If still unknown -> does NOT false-trigger recovery
+# Includes:
+# 1) Backup critical files
+# 2) Strict stale detection (UTC)
+# 3) Level-1: restart bot
+# 4) Level-2: restart service
+# 5) Telegram alerts on recovery events
 #
-# Run daily:
+# Requires:
+# setx TYPEF_ADMIN_TOKEN "TypeF_Admin_2026_...."
+# setx TYPEF_TG_BOT_TOKEN "<telegram_bot_token>"
+# setx TYPEF_TG_CHAT_ID "<chat_id>"
+#
+# Run:
 # powershell -ExecutionPolicy Bypass -File .\production_guard.ps1
-#
-# Token:
-# setx TYPEF_ADMIN_TOKEN "TypeF_Admin_2026_..."
 # ============================
 
 $ErrorActionPreference = "Stop"
@@ -29,11 +28,13 @@ $UI_URL   = "https://hkhitesh19-ui.github.io/LeoAiTesting1/"
 $RECOVERY_ENABLED = $true
 $DRY_RUN          = $false
 
-$STALE_SECONDS    = 600   # 10 min (safer default)
+$STALE_SECONDS    = 300   # 5 min strict
 $L1_RETRIES       = 2
 $L1_SLEEP_SECONDS = 30
 
-$ADMIN_TOKEN = $env:TYPEF_ADMIN_TOKEN
+$ADMIN_TOKEN  = $env:TYPEF_ADMIN_TOKEN
+$TG_BOT_TOKEN = $env:TYPEF_TG_BOT_TOKEN
+$TG_CHAT_ID   = $env:TYPEF_TG_CHAT_ID
 
 $ROOT = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BACKUP_DIR = Join-Path $ROOT "_guard_backups"
@@ -44,6 +45,21 @@ function Info($m){ Write-Host "[INFO] $(TS) $m" }
 function Ok($m){   Write-Host "[OK]   $(TS) $m" }
 function Warn($m){ Write-Host "[WARN] $(TS) $m" }
 function Fail($m){ Write-Host "[FAIL] $(TS) $m" }
+
+# ===== TELEGRAM =====
+function TgSend($text){
+  if(-not $TG_BOT_TOKEN -or -not $TG_CHAT_ID){ return }
+  try{
+    $uri = "https://api.telegram.org/bot$TG_BOT_TOKEN/sendMessage"
+    Invoke-RestMethod -Method Post -Uri $uri -Body @{
+      chat_id = $TG_CHAT_ID
+      text    = $text
+      disable_web_page_preview = $true
+    } | Out-Null
+  }catch{
+    # ignore telegram failures
+  }
+}
 
 # ===== UTILS =====
 function EnsureDir($p){
@@ -72,8 +88,13 @@ function TryGet($url){
     $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 25
     return @{ ok=$true; code=$r.StatusCode; content=$r.Content }
   }catch{
-    try{ $code = $_.Exception.Response.StatusCode.value__ } catch { $code = 0 }
-    return @{ ok=$false; code=$code; content=$null }
+    $body = $null
+    try{
+      $code = $_.Exception.Response.StatusCode.value__
+      $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+      $body = $sr.ReadToEnd()
+    }catch{ $code = 0 }
+    return @{ ok=$false; code=$code; content=$body }
   }
 }
 
@@ -87,9 +108,7 @@ function TryPost($url, $headers){
       $code = $_.Exception.Response.StatusCode.value__
       $sr = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
       $body = $sr.ReadToEnd()
-    }catch{
-      $code = 0
-    }
+    }catch{ $code = 0 }
     return @{ ok=$false; code=$code; content=$body }
   }
 }
@@ -98,11 +117,8 @@ function ParseJsonSafe($text){
   try { return ($text | ConvertFrom-Json) } catch { return $null }
 }
 
-# TIME SAFE:
-# - do NOT assume UTC (backend may send naive time)
-# - parse as local time, since backend string seems naive
-function ToDateSafeLocal($s){
-  try { return [datetime]::Parse($s) } catch { return $null }
+function ToUtcDateSafe($s){
+  try { return ([datetimeoffset]::Parse($s)).UtcDateTime } catch { return $null }
 }
 
 function GetStatusJson(){
@@ -121,21 +137,25 @@ function GetVersionJson(){
 function RestartBot(){
   if(-not $ADMIN_TOKEN){
     Warn "ENV TYPEF_ADMIN_TOKEN not set. Can't call restart endpoints."
+    TgSend "TypeF FAIL: TYPEF_ADMIN_TOKEN missing. Cannot recover."
     return $false
   }
   $h = @{ "X-ADMIN-TOKEN" = $ADMIN_TOKEN }
   $res = TryPost "$API_BASE/admin/restart_bot" $h
   if($res.code -eq 200){
     Ok "Level-1: restart_bot triggered (200)"
+    TgSend "TypeF OK: Level-1 restart_bot triggered."
     return $true
   }
   Warn "Level-1: restart_bot failed HTTP=$($res.code) body=$($res.content)"
+  TgSend "TypeF ALERT: Level-1 restart_bot failed HTTP=$($res.code)"
   return $false
 }
 
 function RestartService(){
   if(-not $ADMIN_TOKEN){
     Warn "ENV TYPEF_ADMIN_TOKEN not set. Can't call restart endpoints."
+    TgSend "TypeF FAIL: TYPEF_ADMIN_TOKEN missing. Cannot recover."
     return $false
   }
   $h = @{ "X-ADMIN-TOKEN" = $ADMIN_TOKEN }
@@ -143,15 +163,16 @@ function RestartService(){
 
   if($res.code -eq 200){
     Ok "Level-2: restart_service triggered (200)"
+    TgSend "TypeF ALERT: Level-2 restart_service triggered."
     return $true
   }
-
   Warn "Level-2: restart_service returned HTTP=$($res.code) (service may still restart)"
+  TgSend "TypeF ALERT: Level-2 restart_service called (HTTP=$($res.code))."
   return $true
 }
 
 # ===== MAIN =====
-Info "Running production_guard.ps1 (v4)"
+Info "Running production_guard.ps1 (v5)"
 Info "Root: $ROOT"
 Info "DRY_RUN = $DRY_RUN"
 Info "API_BASE: $API_BASE"
@@ -180,9 +201,11 @@ if($st){
 if($RECOVERY_ENABLED -and (-not $DRY_RUN)){
   if($null -eq $st){
     Warn "Status JSON unavailable -> Level-1 recovery"
+    TgSend "TypeF ALERT: Status JSON unavailable. Attempting Level-1 recovery."
     $ok = RestartBot
     if(-not $ok){
       Warn "Level-1 failed -> Level-2 restart"
+      TgSend "TypeF ALERT: Level-1 failed. Triggering Level-2 restart."
       RestartService | Out-Null
     }
   }else{
@@ -190,32 +213,27 @@ if($RECOVERY_ENABLED -and (-not $DRY_RUN)){
     $botStatus = $st.botStatus.status
     $botMsg    = $st.botStatus.message
 
-    $now = Get-Date
-    $stTime = ToDateSafeLocal $st.server_time
+    $nowUtc = [datetime]::UtcNow
+    $stTime = ToUtcDateSafe $st.server_time
 
+    $isStale = $false
     $age = $null
     if($stTime){
-      $age = (New-TimeSpan -Start $stTime -End $now).TotalSeconds
-    }
-
-    # SAFE stale evaluation:
-    # only mark stale if we could calculate age
-    $isStale = $false
-    if($age -ne $null){
+      $age = (New-TimeSpan -Start $stTime -End $nowUtc).TotalSeconds
       if($age -gt $STALE_SECONDS){ $isStale = $true }
+    }else{
+      Warn "server_time parse failed -> treat stale"
+      $isStale = $true
     }
 
     $needsRecovery = $false
-
-    # strict triggers
     if($botConn -ne $true){ $needsRecovery = $true }
     if("$botStatus" -match "Error|Disconnected"){ $needsRecovery = $true }
-
-    # stale is a weak trigger: stale only matters if bot not OK also
-    if($isStale -and ($botConn -ne $true)){ $needsRecovery = $true }
+    if($isStale){ $needsRecovery = $true }
 
     if($needsRecovery){
       Warn "Recovery trigger: bot_connected=$botConn botStatus=$botStatus stale=$isStale age=$age msg=$botMsg"
+      TgSend "TypeF ALERT: Recovery trigger. bot_connected=$botConn botStatus=$botStatus stale=$isStale age=$age msg=$botMsg"
 
       $recovered = $false
       for($i=1; $i -le $L1_RETRIES; $i++){
@@ -224,9 +242,19 @@ if($RECOVERY_ENABLED -and (-not $DRY_RUN)){
           Start-Sleep -Seconds 5
           $st2 = GetStatusJson
           if($st2 -and $st2.bot_connected -eq $true){
-            Ok "Recovery success after Level-1"
-            $recovered = $true
-            break
+            $st2Time = ToUtcDateSafe $st2.server_time
+            $st2Stale = $true
+            if($st2Time){
+              $age2 = (New-TimeSpan -Start $st2Time -End ([datetime]::UtcNow)).TotalSeconds
+              if($age2 -le $STALE_SECONDS){ $st2Stale = $false }
+            }
+
+            if(-not $st2Stale){
+              Ok "Recovery success after Level-1"
+              TgSend "TypeF OK: Recovery success after Level-1 bot restart."
+              $recovered = $true
+              break
+            }
           }
         }
         Start-Sleep -Seconds $L1_SLEEP_SECONDS
@@ -234,6 +262,7 @@ if($RECOVERY_ENABLED -and (-not $DRY_RUN)){
 
       if(-not $recovered){
         Warn "Level-1 did not recover -> Level-2 service restart"
+        TgSend "TypeF ALERT: Level-1 did not recover. Triggering Level-2 restart."
         RestartService | Out-Null
       }
     }else{

@@ -1,4 +1,4 @@
-"""
+﻿"""
 TypeF Shoonya Bot (Production Clean)
 - Render safe
 - Starts via FastAPI startup -> start_bot_thread()
@@ -322,6 +322,15 @@ def start_bot_thread():
 
 
 def stop_bot():
-    global _stop_flag
+    global _stop_flag, _bot_thread
     _stop_flag = True
     print("⚠️ Bot stop requested")
+
+    try:
+        if _bot_thread and _bot_thread.is_alive():
+            _bot_thread.join(timeout=8)
+            print("✅ Bot thread stopped")
+    except Exception:
+        pass
+
+

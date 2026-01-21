@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import os
+import time
 import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,14 @@ from pydantic import BaseModel, Field
 # ==========================================================
 app = FastAPI(title="TypeF API", version="1.0.0")
 
+
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+
+def require_admin_token(x_admin_token: str | None):
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN not set on server")
+    if not x_admin_token or x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 # CORS (GitHub Pages UI / any static site)
 app.add_middleware(
     CORSMiddleware,
@@ -326,3 +335,36 @@ def get_status_strict(response: Response):
         tradeHistory=trade_history,
     )
     return payload
+
+
+@app.post("/admin/restart_bot", tags=["admin"])
+def admin_restart_bot(x_admin_token: str | None = Header(default=None, alias="X-ADMIN-TOKEN")):
+    require_admin_token(x_admin_token)
+
+    if "bot" not in globals():
+        raise HTTPException(status_code=500, detail="bot module not loaded")
+
+    try:
+        # Stop existing bot loop
+        if hasattr(bot, "stop_bot"):
+            bot.stop_bot()
+            time.sleep(2)
+
+        # Start fresh bot thread
+        if hasattr(bot, "start_bot_thread"):
+            bot.start_bot_thread()
+        else:
+            raise HTTPException(status_code=500, detail="bot.start_bot_thread missing")
+
+        return {"ok": True, "message": "Bot restart triggered"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Restart bot failed: {e}")
+
+
+@app.post("/admin/restart_service", tags=["admin"])
+def admin_restart_service(x_admin_token: str | None = Header(default=None, alias="X-ADMIN-TOKEN")):
+    require_admin_token(x_admin_token)
+
+    # Hard restart process; Render will relaunch container
+    os._exit(1)
+

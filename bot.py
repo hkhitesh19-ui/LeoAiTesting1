@@ -280,13 +280,22 @@ def bot_loop():
             ltp = prices["ltp"]
             close = prices["close"]
 
-            # update state
-            if ltp > 0:
-                trade_data["current_ltp"] = ltp
+            # update state (BACKEND CONTRACT SAFE)
+# api_server.py expects: ltp, lastClose, lastCloseTime
+# keep old keys too: current_ltp, last_close, last_close_time
+if ltp > 0:
+    trade_data["current_ltp"] = ltp
+    trade_data["ltp"] = ltp
 
-            if close > 0:
-                trade_data["last_close"] = close
-                trade_data["last_close_time"] = datetime.now().strftime("%H:%M:%S")
+if close > 0:
+    trade_data["last_close"] = close
+    trade_data["lastClose"] = close
+
+    trade_data["last_close_time"] = datetime.now().strftime("%H:%M:%S")
+    trade_data["lastCloseTime"] = trade_data["last_close_time"]
+
+from datetime import timezone
+trade_data["last_update_utc"] = datetime.now(timezone.utc).isoformat()
 
             # reduce log spam
             now = time.time()
@@ -332,5 +341,6 @@ def stop_bot():
             print("✅ Bot thread stopped")
     except Exception:
         pass
+
 
 

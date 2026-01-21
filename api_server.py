@@ -209,3 +209,4 @@ def admin_restart_service(x_admin_token: str | None = Header(default=None, alias
 
     threading.Thread(target=_exit, daemon=True).start()
     return {"ok": True, "message": "Service restart triggered"}
+

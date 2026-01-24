@@ -1,0 +1,19 @@
+{"ts": "2026-01-23T17:49:15.605615+00:00", "event": "BOOT", "trace_id": "", "data": {"msg": "papertrade runner v1.4 starting", "ts": "2026-01-23T17:49:15.605313+00:00"}}
+{"ts": "2026-01-23T17:49:16.245555+00:00", "event": "BROKER_LOGIN_OK", "trace_id": "", "data": {"code": "OK"}}
+{"ts": "2026-01-23T17:49:16.744046+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "ENTER", "position": "PUT", "entry": 25064.75, "reason": "close<ema20 AND rsi<45"}}}
+{"ts": "2026-01-23T17:51:11.039959+00:00", "event": "BOOT", "trace_id": "", "data": {"msg": "papertrade runner v1.4 starting", "ts": "2026-01-23T17:51:11.039673+00:00"}}
+{"ts": "2026-01-23T17:51:11.600111+00:00", "event": "BROKER_LOGIN_OK", "trace_id": "", "data": {"code": "OK"}}
+{"ts": "2026-01-23T17:51:12.119793+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "ENTER", "position": "PUT", "entry": 25064.75, "reason": "close<ema20 AND rsi<45"}}}
+{"ts": "2026-01-23T17:51:13.440071+00:00", "event": "BOOT", "trace_id": "", "data": {"msg": "papertrade runner v1.4 starting", "ts": "2026-01-23T17:51:13.439672+00:00"}}
+{"ts": "2026-01-23T17:51:14.120169+00:00", "event": "BROKER_LOGIN_OK", "trace_id": "", "data": {"code": "OK"}}
+{"ts": "2026-01-23T17:51:14.702125+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "ENTER", "position": "PUT", "entry": 25064.75, "reason": "close<ema20 AND rsi<45"}}}
+{"ts": "2026-01-23T17:51:16.126377+00:00", "event": "BOOT", "trace_id": "", "data": {"msg": "papertrade runner v1.4 starting", "ts": "2026-01-23T17:51:16.125956+00:00"}}
+{"ts": "2026-01-23T17:51:16.676378+00:00", "event": "BROKER_LOGIN_OK", "trace_id": "", "data": {"code": "OK"}}
+{"ts": "2026-01-23T17:51:17.190965+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "ENTER", "position": "PUT", "entry": 25064.75, "reason": "close<ema20 AND rsi<45"}}}
+{"ts": "2026-01-23T18:12:36.605077+00:00", "event": "BOOT", "trace_id": "", "data": {"msg": "papertrade runner v2 starting", "ts": "2026-01-23T18:12:36.604503+00:00"}}
+{"ts": "2026-01-23T18:12:37.348771+00:00", "event": "BROKER_LOGIN_OK", "trace_id": "", "data": {"code": "OK"}}
+{"ts": "2026-01-23T18:12:37.905392+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "ENTER", "position": "PUT", "entry": 25064.75, "reason": "close<ema20 AND rsi<45"}, "state": {"position": "PUT", "entry_price": 25064.75, "entry_ts": "2026-01-23T18:12:37.898746+00:00", "trades": 1}}}
+{"ts": "2026-01-23T18:16:08.373814+00:00", "event": "BOOT", "trace_id": "", "data": {"msg": "papertrade runner v2 starting", "ts": "2026-01-23T18:16:08.373789+00:00"}}
+{"ts": "2026-01-23T18:16:08.891727+00:00", "event": "BROKER_LOGIN_OK", "trace_id": "", "data": {"code": "OK"}}
+{"ts": "2026-01-23T18:16:09.776974+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "HOLD_SAME_SIGNAL", "position": "PUT"}, "state": {"position": "PUT", "entry_price": 25064.75, "entry_ts": "2026-01-23T18:12:37.898746+00:00", "trades": 1}}}
+{"ts": "2026-01-23T18:17:11.039665+00:00", "event": "PAPERTRADE_STEP", "trace_id": "", "data": {"decision": "PUT", "close": 25064.75, "action": {"action": "HOLD_SAME_SIGNAL", "position": "PUT"}, "state": {"position": "PUT", "entry_price": 25064.75, "entry_ts": "2026-01-23T18:12:37.898746+00:00", "trades": 1}}}

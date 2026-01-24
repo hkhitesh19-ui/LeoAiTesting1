@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: typef-backend
+    env: python
+    plan: free
+    startCommand: bash render_start.sh

@@ -1,31 +1,29 @@
-"""
-PHASE 2A — INDIA VIX GEAR SELECTOR
-"""
+from prototype.vix_contracts import VixContext
+from prototype.vix_state_recorder_v1 import record_vix_context
+from datetime import datetime
 
-from prototype.vix_contracts import VixContext, now_ts
-
-def select_gear_from_vix(vix: float) -> VixContext:
-    vix = float(vix)
-
+def select_gear_from_vix(vix):
     if vix < 13:
-        return VixContext(
+        ctx = VixContext(
             vix=vix,
-            gear="RATIO_SPREAD",
-            reason="Low VIX < 13 → Gamma expansion",
-            ts=now_ts()
+            gear='RATIO_SPREAD',
+            reason='Low VIX < 13 → Gamma expansion',
+            ts=datetime.utcnow().isoformat() + 'Z'
+        )
+    elif vix <= 18:
+        ctx = VixContext(
+            vix=vix,
+            gear='SAFE_FUTURE',
+            reason='Mid VIX 13–18 → Trend with hedge',
+            ts=datetime.utcnow().isoformat() + 'Z'
+        )
+    else:
+        ctx = VixContext(
+            vix=vix,
+            gear='BULL_CALL_SPREAD',
+            reason='High VIX > 18 → Sell IV',
+            ts=datetime.utcnow().isoformat() + 'Z'
         )
 
-    if 13 <= vix <= 18:
-        return VixContext(
-            vix=vix,
-            gear="SAFE_FUTURE",
-            reason="Mid VIX 13–18 → Trend with hedge",
-            ts=now_ts()
-        )
-
-    return VixContext(
-        vix=vix,
-        gear="BULL_CALL_SPREAD",
-        reason="High VIX > 18 → Sell IV",
-        ts=now_ts()
-    )
+    record_vix_context(ctx)
+    return ctx

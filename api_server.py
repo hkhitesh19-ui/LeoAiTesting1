@@ -115,52 +115,7 @@ def get_status_strict(response: Response):
     last_close = 0.0
     last_close_time = ""
     today_pnl = 0.0
-<<<<<<< HEAD
-    pnl_percentage = 0.0
-    
-    if active and entry_price > 0 and current_ltp > 0:
-        # Calculate P&L with Friction Journal (8 points per lot)
-        # Net P&L = (LTP - Entry) - (8 points × Lots)
-        lots = trade_data.get("model_e_lots", 1) or 1
-        friction_points = 8 * lots
-        raw_pnl = current_ltp - entry_price
-        today_pnl = raw_pnl - friction_points  # Institutional grade P&L
-        pnl_percentage = ((current_ltp - entry_price) / entry_price) * 100
-    
-    # Get trade history (if bot.py has it)
-    trade_history = trade_data.get("trade_history", [])
-    
-    return {
-        "botStatus": {
-            "status": "Active" if active else "Searching",
-            "message": "Market Open" if active else "Scanning"
-        },
-        "todayPnl": round(today_pnl, 2),
-        "pnlPercentage": round(pnl_percentage, 3),
-        "activeTrade": {
-            "symbol": trade_data.get("symbol", "NIFTY FUT"),
-            "entry": entry_price,
-            "sl": sl_price,
-            "ltp": current_ltp,  # ✅ Now showing live LTP!
-            "close": trade_data.get("last_close", 0.0) or 0.0  # Last closing price
-        },
-        "tradeHistory": trade_history,
-        # Model E Data
-        "currentVix": trade_data.get("current_vix", 0.0),
-        "currentGear": trade_data.get("current_gear", 0),
-        "gearStatus": trade_data.get("gear_status", "No Trade"),
-        "modelE": {
-            "vix": trade_data.get("current_vix", 0.0),
-            "gear": trade_data.get("current_gear", 0),
-            "gearStatus": trade_data.get("gear_status", "No Trade"),
-            "signal": trade_data.get("model_e_signal", False),
-            "rsi": trade_data.get("model_e_rsi", 0.0),
-            "st_direction": trade_data.get("model_e_st_direction", 0)
-        }
-    }
-=======
     pnl_pct = 0.0
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
 
     # try pull trade_data from bot if available
     if bot is not None:
@@ -191,8 +146,22 @@ def get_status_strict(response: Response):
             ltp = _f(td.get("ltp", 0))
             last_close = _f(td.get("lastClose", 0))
             last_close_time = str(td.get("lastCloseTime", "") or "")
-            today_pnl = _f(td.get("todayPnl", 0))
-            pnl_pct = _f(td.get("pnlPercentage", 0))
+            
+            # Calculate P&L with Friction Journal (8 points per lot)
+            # Net P&L = (LTP - Entry) - (8 points × Lots)
+            entry_price = _f(td.get("entry_price", 0))
+            current_ltp = ltp
+            active = td.get("active", False)
+            
+            if active and entry_price > 0 and current_ltp > 0:
+                lots = td.get("model_e_lots", 1) or 1
+                friction_points = 8 * lots
+                raw_pnl = current_ltp - entry_price
+                today_pnl = raw_pnl - friction_points  # Institutional grade P&L
+                pnl_pct = ((current_ltp - entry_price) / entry_price) * 100
+            else:
+                today_pnl = _f(td.get("todayPnl", 0))
+                pnl_pct = _f(td.get("pnlPercentage", 0))
 
         except Exception as e:
             bot_connected = False

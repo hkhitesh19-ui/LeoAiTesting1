@@ -147,17 +147,28 @@ def get_status_strict(response: Response):
             last_close = _f(td.get("lastClose", 0))
             last_close_time = str(td.get("lastCloseTime", "") or "")
             
-            # Calculate P&L with Friction Journal (8 points per lot)
-            # Net P&L = (LTP - Entry) - (8 points × Lots)
+            # Calculate P&L with Friction Journal (Realistic P&L for SaaS)
+            # Formula: gross_pnl = (current_ltp - entry_price) * (lots * 50)
+            #         friction_loss = (8 * (lots * 50))  # 8 points per quantity
+            #         net_pnl = gross_pnl - friction_loss
             entry_price = _f(td.get("entry_price", 0))
             current_ltp = ltp
             active = td.get("active", False)
             
             if active and entry_price > 0 and current_ltp > 0:
                 lots = td.get("model_e_lots", 1) or 1
-                friction_points = 8 * lots
-                raw_pnl = current_ltp - entry_price
-                today_pnl = raw_pnl - friction_points  # Institutional grade P&L
+                quantity = lots * 50  # NIFTY lot size is 50
+                
+                # Gross P&L (points per quantity)
+                gross_pnl = (current_ltp - entry_price) * quantity
+                
+                # Friction loss (8 points per quantity)
+                friction_loss = 8 * quantity
+                
+                # Net P&L (Institutional grade)
+                today_pnl = gross_pnl - friction_loss
+                
+                # Percentage calculation
                 pnl_pct = ((current_ltp - entry_price) / entry_price) * 100
             else:
                 today_pnl = _f(td.get("todayPnl", 0))

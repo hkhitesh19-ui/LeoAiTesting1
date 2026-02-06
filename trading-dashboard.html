@@ -3,754 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Type F Strategy | Live Trading Terminal</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+    <title>Model E | Institutional Terminal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            background: linear-gradient(135deg, #0a0e1a 0%, #0f172a 50%, #1e293b 100%);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        /* Trading Numbers Font */
-        .mono-font {
-            font-family: 'JetBrains Mono', monospace;
-            font-variant-numeric: tabular-nums;
-            letter-spacing: -0.02em;
-        }
-        
-        /* Mobile optimizations */
-        @media (max-width: 768px) {
-            .max-w-7xl {
-                padding: 0 1rem;
-            }
-            
-            h1 {
-                font-size: 2rem !important;
-            }
-            
-            .card {
-                padding: 1rem !important;
-            }
-        }
-
-        /* Glassmorphism Cards */
-        .card {
-            background: rgba(30, 41, 59, 0.4);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(148, 163, 184, 0.1);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .card:hover {
-            border-color: rgba(148, 163, 184, 0.2);
-            transform: translateY(-2px);
-            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Active Trade Glow */
-        .card-active-glow {
-            border-color: rgba(52, 211, 153, 0.4);
-            box-shadow: 0 0 24px rgba(52, 211, 153, 0.15), 0 8px 32px rgba(0, 0, 0, 0.37);
-        }
-
-        .pulse-dot {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: .5;
-            }
-        }
-
-        .glow {
-            text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
-        }
-
-        /* Bloomberg-style Profit/Loss Colors */
-        .profit {
-            color: #34d399 !important; /* Emerald-400 */
-            text-shadow: 0 0 12px rgba(52, 211, 153, 0.4);
-        }
-
-        .loss {
-            color: #f43f5e !important; /* Rose-500 */
-            text-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
-        }
-        
-        /* Number Transitions */
-        .number-transition {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        /* Heartbeat Status Colors */
-        .heartbeat-green {
-            color: #34d399;
-            text-shadow: 0 0 10px rgba(52, 211, 153, 0.4);
-        }
-        
-        .heartbeat-yellow {
-            color: #fbbf24;
-            text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
-        }
-        
-        .heartbeat-red {
-            color: #f43f5e;
-            text-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
-        }
-
-        table {
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-
-        tbody tr {
-            background: rgba(30, 41, 59, 0.5);
-            transition: all 0.2s ease;
-        }
-
-        tbody tr:hover {
-            background: rgba(51, 65, 85, 0.7);
-            transform: scale(1.01);
-        }
-
-        .loading {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Scanning Animation */
-        .scanning-line {
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .scanning-line::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.6), transparent);
-            animation: scan 2s ease-in-out infinite;
-        }
-        
-        @keyframes scan {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
-        
-        /* Skeleton Loading */
-        .skeleton {
-            background: linear-gradient(90deg, rgba(51, 65, 85, 0.4) 25%, rgba(71, 85, 105, 0.4) 50%, rgba(51, 65, 85, 0.4) 75%);
-            background-size: 200% 100%;
-            animation: skeleton-loading 1.5s ease-in-out infinite;
-            border-radius: 8px;
-        }
-        
-        @keyframes skeleton-loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-        
-        /* LTP Flash Animation */
-        .flash-green {
-            animation: flashGreen 0.6s ease-out;
-        }
-        
-        .flash-red {
-            animation: flashRed 0.6s ease-out;
-        }
-        
-        @keyframes flashGreen {
-            0% { 
-                background-color: rgba(52, 211, 153, 0.3);
-                transform: scale(1.05);
-            }
-            100% { 
-                background-color: transparent;
-                transform: scale(1);
-            }
-        }
-        
-        @keyframes flashRed {
-            0% { 
-                background-color: rgba(244, 63, 94, 0.3);
-                transform: scale(1.05);
-            }
-            100% { 
-                background-color: transparent;
-                transform: scale(1);
-            }
-        }
+        body { background-color: #0d0e12; color: #e2e8f0; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.3s ease; }
+        .glass:hover { border-color: rgba(34, 211, 238, 0.4); box-shadow: 0 0 20px rgba(34, 211, 238, 0.1); }
+        .neon-text { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
     </style>
 </head>
-<body class="min-h-screen p-6">
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="mb-6 md:mb-8 fade-in">
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 mb-2">
-                <h1 class="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-                    Type F Strategy
-                </h1>
-                <div class="flex items-center gap-2 bg-slate-800/50 px-4 py-2 rounded-full border border-green-500/30 w-fit">
-                    <div class="relative">
-                        <div class="pulse-dot w-2.5 h-2.5 bg-green-500 rounded-full"></div>
-                        <div class="absolute top-0 left-0 w-2.5 h-2.5 bg-green-500 rounded-full animate-ping"></div>
-                    </div>
-                    <span class="text-green-400 font-semibold text-sm uppercase tracking-wide">Live</span>
-                </div>
+<body class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
+            <div>
+                <h1 class="text-4xl font-black tracking-tighter neon-text text-cyan-400">MODEL E</h1>
+                <p class="text-xs uppercase tracking-[0.3em] text-gray-500 font-bold">Institutional Trading Engine</p>
             </div>
-            <p class="text-gray-400 text-sm md:text-base">Real-time trading monitoring system</p>
-        </div>
-
-        <!-- Top Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-            <!-- Bot Status Card -->
-            <div id="botStatusCard" class="card p-4 md:p-6 fade-in">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">Bot Status</h3>
-                    <div id="statusIndicator" class="relative">
-                        <div class="pulse-dot w-3 h-3 bg-green-500 rounded-full"></div>
-                        <div class="absolute top-0 left-0 w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
-                    </div>
-                </div>
-                <p id="botStatus" class="text-xl md:text-2xl font-bold text-green-400 glow mono-font number-transition">Active</p>
-                <p id="botMessage" class="text-xs text-gray-400 mt-1">System operational</p>
-            </div>
-
-            <!-- Current P&L Card -->
-            <div class="card p-4 md:p-6 fade-in">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">Current P&L</h3>
-                    <svg class="w-4 h-4 md:w-5 md:h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                    </svg>
-                </div>
-                <p id="todayPnl" class="text-3xl md:text-4xl font-bold profit mono-font number-transition">₹0.00</p>
-                <p id="pnlPercentage" class="text-xs text-gray-400 mt-1 mono-font">+0.00% change</p>
-            </div>
-
-            <!-- Last Heartbeat Card -->
-            <div class="card p-4 md:p-6 fade-in">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">Last Heartbeat</h3>
-                    <svg id="syncIcon" class="w-4 h-4 md:w-5 md:h-5 text-blue-400 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                    </svg>
-                </div>
-                <p id="lastSync" class="text-xl md:text-2xl font-bold heartbeat-green mono-font number-transition">--:--:--</p>
-                <p id="syncStatus" class="text-xs text-gray-400 mt-1">Waiting for data...</p>
-            </div>
-
-            <!-- VIX Card -->
-            <div class="card p-4 md:p-6 fade-in">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">VIX</h3>
-                    <svg class="w-4 h-4 md:w-5 md:h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                </div>
-                <p id="currentVix" class="text-xl md:text-2xl font-bold text-purple-400 mono-font number-transition">--</p>
-                <p id="vixStatus" class="text-xs text-gray-400 mt-1">Volatility Index</p>
-            </div>
-
-            <!-- Current Gear Card -->
-            <div class="card p-4 md:p-6 fade-in">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">Current Gear</h3>
-                    <svg class="w-4 h-4 md:w-5 md:h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                    </svg>
-                </div>
-                <p id="currentGear" class="text-xl md:text-2xl font-bold text-yellow-400 mono-font number-transition">--</p>
-                <p id="gearStatus" class="text-xs text-gray-400 mt-1">Position Sizing</p>
+            <div id="status-badge" class="px-4 py-2 rounded-full glass text-xs font-bold text-green-400 flex items-center gap-2">
+                <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>
+                ENGINE LIVE
             </div>
         </div>
 
-        <!-- Active Trade Section -->
-        <div id="activeTradeCard" class="card p-4 md:p-6 mb-6 md:mb-8 fade-in transition-all duration-300">
-            <h2 class="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6 flex items-center">
-                <span class="w-1 h-5 md:h-6 bg-emerald-400 mr-2 md:mr-3 rounded"></span>
-                Active Trade
-            </h2>
-            <div id="activeTrade" class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
-                <div class="bg-slate-800/30 backdrop-filter backdrop-blur-sm rounded-xl p-3 md:p-4 border border-slate-700/50">
-                    <p class="text-gray-400 text-xs md:text-sm mb-1 md:mb-2 uppercase tracking-wide">Symbol</p>
-                    <p id="tradeSymbol" class="text-xl md:text-2xl font-bold text-white mono-font number-transition">--</p>
-                </div>
-                <div class="bg-slate-800/30 backdrop-filter backdrop-blur-sm rounded-xl p-3 md:p-4 border border-slate-700/50">
-                    <p class="text-gray-400 text-xs md:text-sm mb-1 md:mb-2 uppercase tracking-wide">Entry</p>
-                    <p id="tradeEntry" class="text-xl md:text-2xl font-bold text-cyan-400 mono-font number-transition">₹0.00</p>
-                </div>
-                <div class="bg-slate-800/30 backdrop-filter backdrop-blur-sm rounded-xl p-3 md:p-4 border border-slate-700/50">
-                    <p class="text-gray-400 text-xs md:text-sm mb-1 md:mb-2 uppercase tracking-wide">SL</p>
-                    <p id="tradeSL" class="text-xl md:text-2xl font-bold text-rose-500 mono-font number-transition">₹0.00</p>
-                </div>
-                <div class="bg-slate-800/30 backdrop-filter backdrop-blur-sm rounded-xl p-3 md:p-4 border border-slate-700/50">
-                    <p class="text-gray-400 text-xs md:text-sm mb-1 md:mb-2 uppercase tracking-wide">Current LTP</p>
-                    <p id="tradeLTP" class="text-xl md:text-2xl font-bold text-emerald-400 mono-font number-transition">₹0.00</p>
-                </div>
-                <div class="bg-slate-800/30 backdrop-filter backdrop-blur-sm rounded-xl p-3 md:p-4 border border-slate-700/50">
-                    <p class="text-gray-400 text-xs md:text-sm mb-1 md:mb-2 uppercase tracking-wide">Last Close</p>
-                    <p id="last-close" class="text-xl md:text-2xl font-bold text-yellow-400 mono-font number-transition">₹0.00</p>
-                </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="glass p-6 rounded-3xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Market Volatility (VIX)</p>
+                <h3 id="vix" class="text-3xl font-mono font-bold text-white">--.--</h3>
             </div>
-            <div id="noActiveTrade" class="text-center py-6 text-gray-400 text-sm hidden">
-                <div class="inline-flex items-center space-x-2">
-                    <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    <span>System is scanning for signals...</span>
-                </div>
+            <div class="glass p-6 rounded-3xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Active Scaling Gear</p>
+                <h3 id="gear" class="text-3xl font-mono font-bold text-orange-400">Neutral</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Friction Journal</p>
+                <h3 class="text-3xl font-mono font-bold text-red-500">-8.00 Pts</h3>
+            </div>
+            <div class="glass p-6 rounded-3xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Current Net Equity</p>
+                <h3 id="equity" class="text-3xl font-mono font-bold text-green-400">₹ 5,00,000</h3>
             </div>
         </div>
 
-        <!-- Recent Trades Table -->
-        <div class="card p-4 md:p-6 fade-in">
-            <h2 class="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6 flex items-center">
-                <span class="w-1 h-5 md:h-6 bg-emerald-400 mr-2 md:mr-3 rounded"></span>
-                Recent Trades
-            </h2>
-            <div class="overflow-x-auto -mx-2 md:mx-0">
-                <table class="w-full min-w-full">
-                    <thead>
-                        <tr class="text-left border-b border-slate-700/50">
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">Time</th>
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">Symbol</th>
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">Type</th>
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">Entry</th>
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">Exit</th>
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">Duration</th>
-                            <th class="pb-3 px-2 text-gray-400 font-medium text-xs md:text-sm uppercase tracking-wide">P&L</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tradeHistory">
-                        <!-- Skeleton Loading -->
-                        <tr>
-                            <td colspan="6" class="py-4">
-                                <div class="space-y-3">
-                                    <div class="skeleton h-10 w-full"></div>
-                                    <div class="skeleton h-10 w-full"></div>
-                                    <div class="skeleton h-10 w-full"></div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="text-center mt-8 text-gray-500 text-sm">
-            <p>Last updated: <span id="footerTime">--</span></p>
+        <div class="mt-10 text-center">
+            <p id="heartbeat" class="text-[10px] text-gray-600 font-mono italic uppercase">Awaiting Data Sync...</p>
         </div>
     </div>
 
     <script>
-        // ==========================================
-        // Configuration
-        // ==========================================
-        const API_URL = 'https://leoaitesting1.onrender.com/get_status';
-        const REFRESH_INTERVAL = 5000; // 5 seconds
-
-        // ==========================================
-        // Utility Functions
-        // ==========================================
-        function formatCurrency(value) {
-            return '₹' + parseFloat(value).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        }
-
-        function formatTime(dateString) {
-            if (!dateString) return '--:--:--';
-            const date = new Date(dateString);
-            return date.toLocaleTimeString('en-IN', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-            });
-        }
-
-        function formatDate(dateString) {
-            if (!dateString) return '--';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('en-IN', { 
-                day: '2-digit', 
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        function calculateDuration(entryTime, exitTime) {
-            if (!entryTime) return '--';
-            
-            const entry = new Date(entryTime);
-            const exit = exitTime ? new Date(exitTime) : new Date();
-            
-            const diffMs = exit - entry;
-            const diffMinutes = Math.floor(diffMs / (1000 * 60));
-            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            
-            if (diffDays > 0) {
-                const remainingHours = diffHours % 24;
-                return `${diffDays}d ${remainingHours}h`;
-            } else if (diffHours > 0) {
-                const remainingMinutes = diffMinutes % 60;
-                return `${diffHours}h ${remainingMinutes}m`;
-            } else {
-                return `${diffMinutes}m`;
-            }
-        }
-
-        // ==========================================
-        // Update Functions
-        // ==========================================
-        function updateBotStatus(data) {
-            const statusEl = document.getElementById('botStatus');
-            const messageEl = document.getElementById('botMessage');
-            const statusCard = document.getElementById('botStatusCard');
-            const statusIndicator = document.getElementById('statusIndicator');
-
-            // Handle /get_status response format
-            if (data.botStatus) {
-                const status = data.botStatus.status;
-                const isActive = status === 'Active';
-                const isSearching = status === 'Searching';
-                
-                statusEl.textContent = status;
-                
-                // Add/remove scanning animation
-                if (isSearching) {
-                    statusCard.classList.add('scanning-line');
-                    statusEl.className = 'text-xl md:text-2xl font-bold text-yellow-400 mono-font number-transition';
-                    statusEl.style.opacity = '0.8';
-                    // Update indicator to yellow
-                    statusIndicator.innerHTML = '<div class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>';
-                } else {
-                    statusCard.classList.remove('scanning-line');
-                    statusEl.className = isActive
-                        ? 'text-xl md:text-2xl font-bold text-emerald-400 glow mono-font number-transition'
-                        : 'text-xl md:text-2xl font-bold text-rose-500 mono-font number-transition';
-                    statusEl.style.opacity = '1';
-                    // Update indicator
-                    if (isActive) {
-                        statusIndicator.innerHTML = `
-                            <div class="pulse-dot w-3 h-3 bg-emerald-400 rounded-full"></div>
-                            <div class="absolute top-0 left-0 w-3 h-3 bg-emerald-400 rounded-full animate-ping"></div>
-                        `;
-                    } else {
-                        statusIndicator.innerHTML = '<div class="w-3 h-3 bg-rose-500 rounded-full"></div>';
-                    }
-                }
-
-                messageEl.textContent = data.botStatus.message || 'System operational';
-            }
-        }
-
-        function updatePnL(data) {
-            const pnlEl = document.getElementById('todayPnl');
-            const percentageEl = document.getElementById('pnlPercentage');
-            
-            const pnl = parseFloat(data.todayPnl || 0);
-            pnlEl.textContent = formatCurrency(pnl);
-            
-            // Apply Emerald/Rose color scheme with mono font
-            pnlEl.className = pnl >= 0 
-                ? 'text-3xl md:text-4xl font-bold profit mono-font number-transition' 
-                : 'text-3xl md:text-4xl font-bold loss mono-font number-transition';
-            
-            const percentage = parseFloat(data.pnlPercentage || 0);
-            percentageEl.textContent = `${percentage >= 0 ? '+' : ''}${percentage.toFixed(3)}% change`;
-            percentageEl.className = percentage >= 0 
-                ? 'text-xs text-emerald-400/80 mt-1 mono-font' 
-                : 'text-xs text-rose-500/80 mt-1 mono-font';
-        }
-
-        // Store last update time globally
-        let lastUpdateTime = new Date();
-        
-        function updateSyncTime(data) {
-            // Update last update time
-            lastUpdateTime = new Date();
-            
-            const lastSyncEl = document.getElementById('lastSync');
-            const syncStatusEl = document.getElementById('syncStatus');
-            const syncIcon = document.getElementById('syncIcon');
-
-            lastSyncEl.textContent = formatTime(lastUpdateTime);
-            syncStatusEl.textContent = 'Connected';
-            document.getElementById('footerTime').textContent = lastUpdateTime.toLocaleString('en-IN');
-
-            // Color code based on freshness
-            lastSyncEl.className = 'text-xl md:text-2xl font-bold heartbeat-green mono-font number-transition';
-
-            syncIcon.classList.add('loading');
-            setTimeout(() => syncIcon.classList.remove('loading'), 1000);
-        }
-        
-        // Check heartbeat freshness every second
-        setInterval(() => {
-            const now = new Date();
-            const secondsSinceUpdate = (now - lastUpdateTime) / 1000;
-            const lastSyncEl = document.getElementById('lastSync');
-            const syncStatusEl = document.getElementById('syncStatus');
-            
-            if (secondsSinceUpdate > 30) {
-                // Red after 30 seconds - Show "Delayed"
-                lastSyncEl.className = 'text-xl md:text-2xl font-bold heartbeat-red mono-font number-transition';
-                syncStatusEl.textContent = 'Delayed';
-                syncStatusEl.className = 'text-xs text-red-500 mt-1 font-semibold';
-            } else if (secondsSinceUpdate > 10) {
-                // Yellow after 10 seconds
-                lastSyncEl.className = 'text-xl md:text-2xl font-bold heartbeat-yellow mono-font number-transition';
-                syncStatusEl.textContent = 'Connected';
-                syncStatusEl.className = 'text-xs text-gray-400 mt-1';
-            } else {
-                // Green when fresh
-                lastSyncEl.className = 'text-xl md:text-2xl font-bold heartbeat-green mono-font number-transition';
-                syncStatusEl.textContent = 'Connected';
-                syncStatusEl.className = 'text-xs text-gray-400 mt-1';
-            }
-        }, 1000);
-
-        // Store previous LTP for comparison
-        let previousLTP = null;
-        
-        function updateActiveTrade(data) {
-            const activeTrade = data.activeTrade;
-            const hasActiveTrade = activeTrade && activeTrade.entry > 0;
-            const activeTradeCard = document.getElementById('activeTradeCard');
-            
-            document.getElementById('activeTrade').style.display = hasActiveTrade ? 'grid' : 'none';
-            document.getElementById('noActiveTrade').style.display = hasActiveTrade ? 'none' : 'block';
-            
-            if (hasActiveTrade) {
-                // Add glow effect when trade is active
-                activeTradeCard.classList.add('card-active-glow');
-                
-                const currentLTP = activeTrade.ltp || 0;
-                const ltpElement = document.getElementById('tradeLTP');
-                
-                document.getElementById('tradeSymbol').textContent = activeTrade.symbol || '--';
-                document.getElementById('tradeEntry').textContent = formatCurrency(activeTrade.entry || 0);
-                document.getElementById('tradeSL').textContent = formatCurrency(activeTrade.sl || 0);
-                
-                // Update Last Close price
-                document.getElementById('last-close').innerText = data.activeTrade.close || '0.00';
-                
-                // Flash animation when LTP changes
-                if (previousLTP !== null && previousLTP !== currentLTP) {
-                    // Remove any existing animation classes
-                    ltpElement.classList.remove('flash-green', 'flash-red');
-                    
-                    // Trigger reflow to restart animation
-                    void ltpElement.offsetWidth;
-                    
-                    // Add appropriate flash class based on price movement
-                    if (currentLTP > previousLTP) {
-                        ltpElement.classList.add('flash-green');
-                    } else if (currentLTP < previousLTP) {
-                        ltpElement.classList.add('flash-red');
-                    }
-                    
-                    // Remove animation class after it completes
-                    setTimeout(() => {
-                        ltpElement.classList.remove('flash-green', 'flash-red');
-                    }, 600);
-                }
-                
-                ltpElement.textContent = formatCurrency(currentLTP);
-                previousLTP = currentLTP;
-            } else {
-                // Remove glow when no trade
-                activeTradeCard.classList.remove('card-active-glow');
-            }
-        }
-
-        function updateModelE(data) {
-            // Update VIX
-            const vixEl = document.getElementById('currentVix');
-            const vixStatusEl = document.getElementById('vixStatus');
-            const currentVix = parseFloat(data.currentVix || data.modelE?.vix || 0);
-            
-            if (currentVix > 0) {
-                vixEl.textContent = currentVix.toFixed(2);
-                vixEl.className = 'text-xl md:text-2xl font-bold text-purple-400 mono-font number-transition';
-                
-                // Color code based on VIX level
-                if (currentVix < 14) {
-                    vixStatusEl.textContent = 'Low Volatility';
-                    vixStatusEl.className = 'text-xs text-emerald-400 mt-1';
-                } else if (currentVix >= 14 && currentVix < 16) {
-                    vixStatusEl.textContent = 'Medium Volatility';
-                    vixStatusEl.className = 'text-xs text-yellow-400 mt-1';
-                } else if (currentVix >= 16 && currentVix <= 18) {
-                    vixStatusEl.textContent = 'High Volatility - No Trade';
-                    vixStatusEl.className = 'text-xs text-red-400 mt-1';
-                } else {
-                    vixStatusEl.textContent = 'Very High Volatility';
-                    vixStatusEl.className = 'text-xs text-rose-500 mt-1';
-                }
-            } else {
-                vixEl.textContent = '--';
-                vixStatusEl.textContent = 'Volatility Index';
-            }
-            
-            // Update Gear
-            const gearEl = document.getElementById('currentGear');
-            const gearStatusEl = document.getElementById('gearStatus');
-            const gear = parseInt(data.currentGear || data.modelE?.gear || 0);
-            const gearStatus = data.gearStatus || data.modelE?.gearStatus || 'No Trade';
-            
-            gearEl.textContent = gear.toString();
-            
-            // Color code based on gear
-            if (gear === 0) {
-                gearEl.className = 'text-xl md:text-2xl font-bold text-red-400 mono-font number-transition';
-                gearStatusEl.textContent = 'No Trade';
-                gearStatusEl.className = 'text-xs text-red-400 mt-1';
-            } else if (gear === 1) {
-                gearEl.className = 'text-xl md:text-2xl font-bold text-yellow-400 mono-font number-transition';
-                gearStatusEl.textContent = 'Low Gear';
-                gearStatusEl.className = 'text-xs text-yellow-400 mt-1';
-            } else if (gear === 2) {
-                gearEl.className = 'text-xl md:text-2xl font-bold text-blue-400 mono-font number-transition';
-                gearStatusEl.textContent = 'Medium Gear';
-                gearStatusEl.className = 'text-xs text-blue-400 mt-1';
-            } else if (gear === 3) {
-                gearEl.className = 'text-xl md:text-2xl font-bold text-emerald-400 mono-font number-transition';
-                gearStatusEl.textContent = 'High Gear';
-                gearStatusEl.className = 'text-xs text-emerald-400 mt-1';
-            } else {
-                gearEl.className = 'text-xl md:text-2xl font-bold text-gray-400 mono-font number-transition';
-                gearStatusEl.textContent = gearStatus;
-            }
-        }
-
-        function updateTradeHistory(data) {
-            const tbody = document.getElementById('tradeHistory');
-            const history = data.tradeHistory || [];
-            
-            if (!history || history.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" class="py-6 text-center text-gray-400 text-sm">
-                            <div class="flex items-center justify-center space-x-2">
-                                <svg class="w-4 h-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                                <span>No trade history available</span>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = history.map(trade => {
-                const pnl = parseFloat(trade.pnl || 0);
-                const pnlClass = pnl >= 0 ? 'profit' : 'loss';
-                const type = trade.type || 'N/A';
-                const typeClass = type.toUpperCase() === 'BUY' ? 'text-emerald-400' : 'text-rose-500';
-                const duration = calculateDuration(trade.time || trade.entryTime, trade.exitTime);
-                
-                return `
-                    <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors duration-200">
-                        <td class="py-3 md:py-4 px-2 text-gray-300 text-xs md:text-sm mono-font">${formatDate(trade.time)}</td>
-                        <td class="py-3 md:py-4 px-2 text-white font-semibold text-xs md:text-sm mono-font">${trade.symbol || 'N/A'}</td>
-                        <td class="py-3 md:py-4 px-2 ${typeClass} font-medium text-xs md:text-sm uppercase">${type}</td>
-                        <td class="py-3 md:py-4 px-2 text-gray-300 text-xs md:text-sm mono-font">${formatCurrency(trade.entry || 0)}</td>
-                        <td class="py-3 md:py-4 px-2 text-gray-300 text-xs md:text-sm mono-font">${formatCurrency(trade.exit || 0)}</td>
-                        <td class="py-3 md:py-4 px-2 text-cyan-400 text-xs md:text-sm mono-font font-medium">${duration}</td>
-                        <td class="py-3 md:py-4 px-2 ${pnlClass} font-bold text-xs md:text-sm mono-font">${formatCurrency(pnl)}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        // ==========================================
-        // Fetch Data
-        // ==========================================
-        async function fetchData() {
+        async function fetchStatus() {
             try {
-                const response = await fetch(API_URL, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
+                const res = await fetch('/get_status');
+                const data = await res.json();
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                // Update VIX
+                const vixValue = data.currentVix || data.vix || data.modelE?.vix || 0;
+                document.getElementById('vix').innerText = vixValue.toFixed(2);
+                
+                // Update Gear
+                const gearStatus = data.gearStatus || data.gear_status || data.modelE?.gearStatus || 'Neutral';
+                document.getElementById('gear').innerText = gearStatus;
+                
+                // Update Equity (if available)
+                if (data.equity) {
+                    document.getElementById('equity').innerText = data.equity;
                 }
                 
-                const data = await response.json();
-                
-                // Update all sections
-                updateBotStatus(data);
-                updatePnL(data);
-                updateSyncTime(data);
-                updateActiveTrade(data);
-                updateTradeHistory(data);
-                updateModelE(data);  // VIX and Gear
-                
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                
-                // Show disconnected state
-                document.getElementById('syncStatus').textContent = 'Disconnected';
-                document.getElementById('syncStatus').className = 'text-xs text-red-500 mt-1';
-                
-                document.getElementById('botStatus').textContent = 'Disconnected';
-                document.getElementById('botStatus').className = 'text-2xl font-bold text-red-400';
-                document.getElementById('botMessage').textContent = 'Unable to reach server';
-                
-                document.getElementById('lastSync').textContent = 'Offline';
-                document.getElementById('lastSync').className = 'text-2xl font-bold text-red-400';
+                // Update Heartbeat
+                const engineStatus = data.model_e_active !== false ? 'READY' : 'ERROR';
+                document.getElementById('heartbeat').innerText = `Sync: ${new Date().toLocaleTimeString()} | Engine: ${engineStatus}`;
+            } catch (err) {
+                document.getElementById('heartbeat').innerText = "CONNECTION LOST";
+                console.error('Status fetch error:', err);
             }
         }
-
-        // ==========================================
-        // Initialize
-        // ==========================================
-        // Fetch data immediately on load
-        fetchData();
-
-        // Set up auto-refresh
-        setInterval(fetchData, REFRESH_INTERVAL);
-
-        console.log('Trading Dashboard initialized');
-        console.log('Fetching data from:', API_URL);
-        console.log('Refresh interval:', REFRESH_INTERVAL / 1000, 'seconds');
+        setInterval(fetchStatus, 3000);
+        fetchStatus();
     </script>
 </body>
-</html>
 </html>

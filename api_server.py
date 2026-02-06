@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 
 from fastapi import FastAPI, Response, HTTPException, Header
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -45,6 +46,17 @@ try:
 except Exception as e:
     bot = None
 
+# =========================
+# Model E Logic Import
+# =========================
+try:
+    import model_e_logic as model_e
+    MODEL_E_AVAILABLE = True
+except ImportError:
+    MODEL_E_AVAILABLE = False
+    print("⚠️ model_e_logic.py not found! Model E features disabled.")
+    model_e = None
+
 
 # =========================
 # Models
@@ -65,6 +77,12 @@ class StatusResponse(BaseModel):
     ltp: float = 0.0
     lastClose: float = 0.0
     lastCloseTime: str = ""
+    # Model E Data
+    currentVix: float = 0.0
+    currentGear: int = 0
+    gearStatus: str = "No Trade"
+    model_e_active: bool = False
+    equity: Optional[str] = None
 
 
 # =========================
@@ -86,8 +104,15 @@ BUILD_TIME = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 # =========================
 @app.get("/health", tags=["system"])
 def health():
-    return {"ok": True}
+    return {"ok": True, "engine": "Model E", "model_e_available": MODEL_E_AVAILABLE}
 
+@app.get("/dashboard", tags=["dashboard"])
+async def get_dashboard():
+    """Dashboard Route - FIX: This solves the 404/Not Found error"""
+    # Looks for trading-dashboard.html in the root directory
+    if os.path.exists("trading-dashboard.html"):
+        return FileResponse("trading-dashboard.html")
+    return JSONResponse(status_code=404, content={"detail": "Dashboard file not found on server"})
 
 @app.get("/version", tags=["system"])
 def version():

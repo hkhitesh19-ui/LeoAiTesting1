@@ -231,7 +231,7 @@
         </div>
 
         <!-- Top Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <!-- Bot Status Card -->
             <div id="botStatusCard" class="card p-4 md:p-6 fade-in">
                 <div class="flex items-center justify-between mb-2">
@@ -267,6 +267,30 @@
                 </div>
                 <p id="lastSync" class="text-xl md:text-2xl font-bold heartbeat-green mono-font number-transition">--:--:--</p>
                 <p id="syncStatus" class="text-xs text-gray-400 mt-1">Waiting for data...</p>
+            </div>
+
+            <!-- VIX Card -->
+            <div class="card p-4 md:p-6 fade-in">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">VIX</h3>
+                    <svg class="w-4 h-4 md:w-5 md:h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <p id="currentVix" class="text-xl md:text-2xl font-bold text-purple-400 mono-font number-transition">--</p>
+                <p id="vixStatus" class="text-xs text-gray-400 mt-1">Volatility Index</p>
+            </div>
+
+            <!-- Current Gear Card -->
+            <div class="card p-4 md:p-6 fade-in">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-gray-400 text-xs md:text-sm font-medium uppercase tracking-wide">Current Gear</h3>
+                    <svg class="w-4 h-4 md:w-5 md:h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                    </svg>
+                </div>
+                <p id="currentGear" class="text-xl md:text-2xl font-bold text-yellow-400 mono-font number-transition">--</p>
+                <p id="gearStatus" class="text-xs text-gray-400 mt-1">Position Sizing</p>
             </div>
         </div>
 
@@ -571,6 +595,66 @@
             }
         }
 
+        function updateModelE(data) {
+            // Update VIX
+            const vixEl = document.getElementById('currentVix');
+            const vixStatusEl = document.getElementById('vixStatus');
+            const currentVix = parseFloat(data.currentVix || data.modelE?.vix || 0);
+            
+            if (currentVix > 0) {
+                vixEl.textContent = currentVix.toFixed(2);
+                vixEl.className = 'text-xl md:text-2xl font-bold text-purple-400 mono-font number-transition';
+                
+                // Color code based on VIX level
+                if (currentVix < 14) {
+                    vixStatusEl.textContent = 'Low Volatility';
+                    vixStatusEl.className = 'text-xs text-emerald-400 mt-1';
+                } else if (currentVix >= 14 && currentVix < 16) {
+                    vixStatusEl.textContent = 'Medium Volatility';
+                    vixStatusEl.className = 'text-xs text-yellow-400 mt-1';
+                } else if (currentVix >= 16 && currentVix <= 18) {
+                    vixStatusEl.textContent = 'High Volatility - No Trade';
+                    vixStatusEl.className = 'text-xs text-red-400 mt-1';
+                } else {
+                    vixStatusEl.textContent = 'Very High Volatility';
+                    vixStatusEl.className = 'text-xs text-rose-500 mt-1';
+                }
+            } else {
+                vixEl.textContent = '--';
+                vixStatusEl.textContent = 'Volatility Index';
+            }
+            
+            // Update Gear
+            const gearEl = document.getElementById('currentGear');
+            const gearStatusEl = document.getElementById('gearStatus');
+            const gear = parseInt(data.currentGear || data.modelE?.gear || 0);
+            const gearStatus = data.gearStatus || data.modelE?.gearStatus || 'No Trade';
+            
+            gearEl.textContent = gear.toString();
+            
+            // Color code based on gear
+            if (gear === 0) {
+                gearEl.className = 'text-xl md:text-2xl font-bold text-red-400 mono-font number-transition';
+                gearStatusEl.textContent = 'No Trade';
+                gearStatusEl.className = 'text-xs text-red-400 mt-1';
+            } else if (gear === 1) {
+                gearEl.className = 'text-xl md:text-2xl font-bold text-yellow-400 mono-font number-transition';
+                gearStatusEl.textContent = 'Low Gear';
+                gearStatusEl.className = 'text-xs text-yellow-400 mt-1';
+            } else if (gear === 2) {
+                gearEl.className = 'text-xl md:text-2xl font-bold text-blue-400 mono-font number-transition';
+                gearStatusEl.textContent = 'Medium Gear';
+                gearStatusEl.className = 'text-xs text-blue-400 mt-1';
+            } else if (gear === 3) {
+                gearEl.className = 'text-xl md:text-2xl font-bold text-emerald-400 mono-font number-transition';
+                gearStatusEl.textContent = 'High Gear';
+                gearStatusEl.className = 'text-xs text-emerald-400 mt-1';
+            } else {
+                gearEl.className = 'text-xl md:text-2xl font-bold text-gray-400 mono-font number-transition';
+                gearStatusEl.textContent = gearStatus;
+            }
+        }
+
         function updateTradeHistory(data) {
             const tbody = document.getElementById('tradeHistory');
             const history = data.tradeHistory || [];
@@ -636,6 +720,7 @@
                 updateSyncTime(data);
                 updateActiveTrade(data);
                 updateTradeHistory(data);
+                updateModelE(data);  // VIX and Gear
                 
             } catch (error) {
                 console.error('Error fetching data:', error);

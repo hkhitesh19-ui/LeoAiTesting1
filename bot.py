@@ -1,21 +1,34 @@
 """
-Type F Trading Strategy Bot (Render-ready)
+Model E Trading Strategy Bot (Render-ready)
+Volatility-Adjusted Position Sizing (VAPS) with Structural Hedge
 - Handles Shoonya login
 - Finds NIFTY current month future token
 - Provides LIVE LTP
+- Model E strategy scanning (1-hour timeframe)
+- VIX-based position sizing
 - Keeps last_close LTP for after-market display
-- NO dynamic pip install
-- NO circular import
 """
 
 import os
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 import pyotp
 
 # REQUIRED dependency (must be in requirements.txt)
 from NorenApi import NorenApi
+
+# Model E Logic
+try:
+    from model_e_logic import calculate_model_e_indicators, get_vaps_lots, get_gear_from_vix, get_gear_status
+    MODEL_E_AVAILABLE = True
+except ImportError:
+    print("⚠️ model_e_logic not available. Model E features disabled.")
+    MODEL_E_AVAILABLE = False
+    def calculate_model_e_indicators(*args, **kwargs): return None
+    def get_vaps_lots(*args, **kwargs): return 0
+    def get_gear_from_vix(*args, **kwargs): return 0
+    def get_gear_status(*args, **kwargs): return "No Trade"
 
 
 # ==============================
@@ -235,6 +248,136 @@ def get_live_ltp() -> float:
         trade_data["last_error"] = f"LTP fetch error: {e}"
         return float(trade_data.get("current_ltp") or 0.0)
 
+# ==============================
+# Model E Strategy Scanner
+# ==============================
+def scan_for_model_e():
+    """
+    Model E Strategy Scanner
+    Scans for signals every 1 hour based on:
+    - SuperTrend trend flip
+    - RSI filter (< 65)
+    - Price action (above ST line and EMA20)
+    - VIX-based position sizing
+    """
+    try:
+        if not MODEL_E_AVAILABLE:
+            print("⚠️ Model E logic not available")
+            return
+        
+        import pandas as pd
+        
+        # 1. Fetch 1-min historical data (last 24 hours = 1440 minutes)
+        fut_token = trade_data.get("fut_token")
+        if not fut_token:
+            print("⚠️ FUT token not available for Model E scan")
+            return
+        
+        # Get NIFTY spot token for historical data (26000 = NIFTY 50)
+        nifty_spot_token = "26000"
+        
+        # Calculate time range (last 24 hours)
+        end_time = datetime.now()
+        start_time = end_time - timedelta(hours=24)
+        
+        # Fetch historical data
+        try:
+            raw_data = api.get_time_price_series(
+                exchange='NSE',
+                token=nifty_spot_token,
+                start_time=start_time.strftime('%Y-%m-%d %H:%M:%S'),
+                end_time=end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                interval='1'
+            )
+            
+            if not raw_data or len(raw_data) == 0:
+                print("⚠️ No historical data available for Model E")
+                return
+            
+            # Convert to DataFrame
+            df_1min = pd.DataFrame(raw_data)
+            df_1min.columns = ['time', 'open', 'high', 'low', 'close', 'volume']
+            
+            # Calculate indicators
+            df_1h = calculate_model_e_indicators(df_1min)
+            
+            if df_1h.empty or len(df_1h) < 2:
+                print("⚠️ Insufficient data for Model E analysis")
+                return
+            
+            # Signal Candle (Last completed 1H candle)
+            bar_i = df_1h.iloc[-1]
+            bar_prev = df_1h.iloc[-2]
+            
+            # 2. Check Conditions
+            trend_flip = (bar_i['st_direction'] == 1 and bar_prev['st_direction'] == -1)
+            rsi_filter = bar_i['rsi'] < 65
+            price_action = (bar_i['close'] > bar_i['st_line']) and (bar_i['close'] > bar_i['ema20'])
+            
+            # Update trade_data with current indicators
+            trade_data['model_e_st_direction'] = int(bar_i['st_direction'])
+            trade_data['model_e_rsi'] = float(bar_i['rsi'])
+            trade_data['model_e_ema20'] = float(bar_i['ema20'])
+            trade_data['model_e_st_line'] = float(bar_i['st_line'])
+            
+            # Get VIX
+            try:
+                vix_token = "26017"  # VIX token
+                vix_data = api.get_quotes(exchange='NSE', token=vix_token)
+                current_vix = float(vix_data.get('lp', 0))
+                trade_data['current_vix'] = current_vix
+                trade_data['current_gear'] = get_gear_from_vix(current_vix)
+                trade_data['gear_status'] = get_gear_status(current_vix)
+            except Exception as e:
+                print(f"⚠️ VIX fetch error: {e}")
+                current_vix = 0
+                trade_data['current_vix'] = 0
+                trade_data['current_gear'] = 0
+                trade_data['gear_status'] = "No Trade"
+            
+            # Check if signal conditions met
+            if trend_flip and rsi_filter and price_action:
+                print(f"✅ Model E Signal Detected!")
+                print(f"   Trend Flip: {trend_flip}")
+                print(f"   RSI: {bar_i['rsi']:.2f} (< 65)")
+                print(f"   Price > ST: {bar_i['close'] > bar_i['st_line']}")
+                print(f"   Price > EMA20: {bar_i['close'] > bar_i['ema20']}")
+                print(f"   VIX: {current_vix:.2f}")
+                
+                # Get VIX & Capital for position sizing
+                net_equity = float(trade_data.get("net_equity", 1000000))  # Default 10L
+                lots = get_vaps_lots(current_vix, net_equity)
+                
+                if lots > 0:
+                    # Entry Logic
+                    stop_loss = bar_i['close'] - (2.0 * bar_i['atr'])
+                    entry_price = bar_i['close']
+                    
+                    print(f"   Lots: {lots}")
+                    print(f"   Entry: {entry_price:.2f}")
+                    print(f"   SL: {stop_loss:.2f}")
+                    
+                    # Execute trade (placeholder - implement execute_model_e_trade)
+                    # execute_model_e_trade(lots, stop_loss, entry_price)
+                    trade_data['model_e_signal'] = True
+                    trade_data['model_e_lots'] = lots
+                    trade_data['model_e_entry'] = entry_price
+                    trade_data['model_e_sl'] = stop_loss
+                else:
+                    print(f"   ⚠️ No trade: Gear = 0 (VIX: {current_vix:.2f})")
+                    trade_data['model_e_signal'] = False
+            else:
+                trade_data['model_e_signal'] = False
+                print(f"ℹ️ Model E: No signal (Trend Flip: {trend_flip}, RSI: {bar_i['rsi']:.2f})")
+                
+        except Exception as e:
+            print(f"❌ Model E scan error: {e}")
+            trade_data["last_error"] = f"Model E scan error: {str(e)}"
+            
+    except Exception as e:
+        print(f"❌ scan_for_model_e exception: {e}")
+        trade_data["last_error"] = f"Model E exception: {str(e)}"
+
 def start_bot_thread():
     global _BOT_THREAD_STARTED
     if _BOT_THREAD_STARTED:
@@ -264,7 +407,10 @@ def bot_loop():
         trade_data["fut_token"] = tok
         print("✅ FUT token:", tok)
 
-    # ---- 3) Quote updater loop ----
+    # ---- 3) Quote updater + Model E scanner loop ----
+    last_scan_time = None
+    scan_interval = 3600  # 1 hour in seconds
+    
     while not _STOP_BOT:
         try:
             tok = trade_data.get("fut_token")
@@ -280,7 +426,13 @@ def bot_loop():
                         trade_data["last_close"] = float(q.get("pc", q.get("c", 0)))
                         trade_data["last_close_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                # if no live lp: keep last_close as fallback
+                # Model E scanning (every 1 hour)
+                current_time = time.time()
+                if last_scan_time is None or (current_time - last_scan_time) >= scan_interval:
+                    if MODEL_E_AVAILABLE:
+                        scan_for_model_e()
+                    last_scan_time = current_time
+
             time.sleep(2)
 
         except Exception as e:

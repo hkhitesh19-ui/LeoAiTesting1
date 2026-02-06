@@ -204,6 +204,22 @@ def get_status_strict(response: Response):
             bot_status = "Error"
             bot_msg = f"Bot exception: {e}"
 
+    # Model E Data Extraction
+    current_vix = 0.0
+    current_gear = 0
+    gear_status = "No Trade"
+    net_equity = 500000.00  # Default
+    
+    if bot is not None:
+        try:
+            td: Dict[str, Any] = getattr(bot, "trade_data", {}) or {}
+            current_vix = float(td.get("current_vix", 0))
+            current_gear = int(td.get("current_gear", 0))
+            gear_status = str(td.get("gear_status", "No Trade"))
+            net_equity = float(td.get("net_equity", 500000))
+        except Exception:
+            pass
+
     payload = StatusResponse(
         version=_git_commit_short(),
         build_time=BUILD_TIME,
@@ -215,6 +231,12 @@ def get_status_strict(response: Response):
         ltp=ltp,
         lastClose=last_close,
         lastCloseTime=last_close_time,
+        # Model E Data
+        currentVix=current_vix,
+        currentGear=current_gear,
+        gearStatus=gear_status,
+        model_e_active=MODEL_E_AVAILABLE,
+        equity=f"₹ {net_equity:,.2f}",
     )
     return payload
 

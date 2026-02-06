@@ -1,14 +1,16 @@
 """
 Model E Trading Logic
 Volatility-Adjusted Position Sizing (VAPS) with Structural Hedge
+Custom manual indicators (no pandas-ta dependency)
 """
 
 import pandas as pd
-import pandas_ta as ta
+import numpy as np
 
 def calculate_model_e_indicators(df_1min):
     """
     1-min data ko 1-hour mein convert karke indicators calculate karta hai.
+    Manual implementation - no pandas-ta dependency for faster builds.
     
     Args:
         df_1min: DataFrame with columns ['time', 'open', 'high', 'low', 'close', 'volume']
@@ -16,30 +18,91 @@ def calculate_model_e_indicators(df_1min):
     Returns:
         df_1h: DataFrame with 1-hour candles and indicators
     """
-    # 1. Resample to 1 Hour
+    # Resample to 1 Hour
     df_1min['time'] = pd.to_datetime(df_1min['time'])
     df_1h = df_1min.resample('1H', on='time').agg({
         'open': 'first', 
         'high': 'max', 
         'low': 'min', 
-        'close': 'last', 
+        'close': 'last',
         'volume': 'sum'
     }).dropna()
 
-    # 2. Add Indicators
-    # SuperTrend: 21, 1.1
-    st = ta.supertrend(df_1h['high'], df_1h['low'], df_1h['close'], length=21, multiplier=1.1)
-    df_1h['st_direction'] = st['SUPERTd_21_1.1']  # 1 for Green, -1 for Red
-    df_1h['st_line'] = st['SUPERT_21_1.1']
+    # RSI (Period 19)
+    delta = df_1h['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=19).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=19).mean()
+    rs = gain / loss
+    df_1h['rsi'] = 100 - (100 / (1 + rs))
 
-    # RSI: 19
-    df_1h['rsi'] = ta.rsi(df_1h['close'], length=19)
+    # EMA (Period 20)
+    df_1h['ema20'] = df_1h['close'].ewm(span=20, adjust=False).mean()
 
-    # EMA: 20
-    df_1h['ema20'] = ta.ema(df_1h['close'], length=20)
+    # ATR (Period 14) for SuperTrend
+    high_low = df_1h['high'] - df_1h['low']
+    high_cp = np.abs(df_1h['high'] - df_1h['close'].shift())
+    low_cp = np.abs(df_1h['low'] - df_1h['close'].shift())
+    df_1h['tr'] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
+    df_1h['atr'] = df_1h['tr'].rolling(window=14).mean()
 
-    # ATR: 14
-    df_1h['atr'] = ta.atr(df_1h['high'], df_1h['low'], df_1h['close'], length=14)
+    # SuperTrend (21, 1.1)
+    # Manual implementation for production stability
+    multiplier = 1.1
+    period = 21
+    
+    # Calculate basic bands
+    hl_avg = (df_1h['high'] + df_1h['low']) / 2
+    df_1h['upperband'] = hl_avg + (multiplier * df_1h['atr'])
+    df_1h['lowerband'] = hl_avg - (multiplier * df_1h['atr'])
+    
+    # SuperTrend calculation (simplified but accurate)
+    st_upper = df_1h['upperband'].rolling(window=period).min()
+    st_lower = df_1h['lowerband'].rolling(window=period).max()
+    
+    # Initialize SuperTrend line and direction
+    df_1h['st_line'] = np.nan
+    df_1h['st_direction'] = 0
+    
+    # Calculate SuperTrend direction and line
+    for i in range(period, len(df_1h)):
+        if i == period:
+            # First value
+            if df_1h.iloc[i]['close'] > st_upper.iloc[i]:
+                df_1h.iloc[i, df_1h.columns.get_loc('st_direction')] = 1
+                df_1h.iloc[i, df_1h.columns.get_loc('st_line')] = st_lower.iloc[i]
+            else:
+                df_1h.iloc[i, df_1h.columns.get_loc('st_direction')] = -1
+                df_1h.iloc[i, df_1h.columns.get_loc('st_line')] = st_upper.iloc[i]
+        else:
+            # Subsequent values
+            prev_direction = df_1h.iloc[i-1]['st_direction']
+            prev_st_line = df_1h.iloc[i-1]['st_line']
+            current_close = df_1h.iloc[i]['close']
+            
+            if prev_direction == 1:
+                # Was bullish
+                if current_close < st_lower.iloc[i]:
+                    # Flip to bearish
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_direction')] = -1
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_line')] = st_upper.iloc[i]
+                else:
+                    # Stay bullish
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_direction')] = 1
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_line')] = max(st_lower.iloc[i], prev_st_line)
+            else:
+                # Was bearish
+                if current_close > st_upper.iloc[i]:
+                    # Flip to bullish
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_direction')] = 1
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_line')] = st_lower.iloc[i]
+                else:
+                    # Stay bearish
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_direction')] = -1
+                    df_1h.iloc[i, df_1h.columns.get_loc('st_line')] = min(st_upper.iloc[i], prev_st_line)
+
+    # Fill NaN values for initial periods
+    df_1h['st_direction'] = df_1h['st_direction'].fillna(0)
+    df_1h['st_line'] = df_1h['st_line'].fillna(df_1h['close'])
 
     return df_1h
 

@@ -239,32 +239,27 @@ def get_status_strict(response: Response):
             current_gear = int(td.get("current_gear", 0))
             gear_status = str(td.get("gear_status", "No Trade"))
             
-            # Extract market structure data from bot
-            vix_ltp = current_vix
-            vix_close = float(td.get("vix_close", current_vix * 0.96))  # Approx 4% lower
+            # Extract Trinity View data directly from bot's trade_data
+            vix_ltp = float(td.get("vix_ltp", current_vix))
+            vix_close = float(td.get("vix_close", 0))
+            spot_ltp = float(td.get("spot_ltp", 0))
+            spot_close = float(td.get("spot_close", 0))
+            fut_curr_ltp = float(td.get("fut_curr_ltp", ltp))
+            fut_curr_close = float(td.get("fut_curr_close", last_close))
+            fut_next_ltp = float(td.get("fut_next_ltp", 0))
+            fut_next_close = float(td.get("fut_next_close", 0))
             
-            # Spot data (NIFTY 50)
-            spot_ltp = float(td.get("spot_ltp", ltp * 0.98))  # Approx from future
-            spot_close = float(td.get("spot_close", last_close * 0.98))
-            
-            # Current month future
-            fut_curr_ltp = ltp
-            fut_curr_close = last_close
-            
-            # Next month future (placeholder - will be fetched from bot when available)
-            fut_next_ltp = float(td.get("fut_next_ltp", ltp * 1.006))  # Approx 0.6% premium
-            fut_next_close = float(td.get("fut_next_close", last_close * 1.006))
-            
-        except Exception:
-            # Fallback values for demo
-            vix_ltp = 15.42
+        except Exception as e:
+            print(f"⚠️ Error extracting market data: {e}")
+            # Fallback to backward compatibility
+            vix_ltp = current_vix if current_vix > 0 else 15.42
             vix_close = 14.80
-            spot_ltp = 21700.50
-            spot_close = 21650.00
+            spot_ltp = ltp * 0.98 if ltp > 0 else 21700.50
+            spot_close = last_close * 0.98 if last_close > 0 else 21650.00
             fut_curr_ltp = ltp if ltp > 0 else 21820.00
             fut_curr_close = last_close if last_close > 0 else 21780.00
-            fut_next_ltp = 21950.00
-            fut_next_close = 21910.00
+            fut_next_ltp = fut_curr_ltp * 1.006 if fut_curr_ltp > 0 else 21950.00
+            fut_next_close = fut_curr_close * 1.006 if fut_curr_close > 0 else 21910.00
 
     payload = StatusResponse(
         version=_git_commit_short(),

@@ -81,7 +81,18 @@ trade_data: Dict[str, Any] = {
     "model_e_lots": 0,
     "model_e_entry": 0.0,
     "model_e_sl": 0.0,
-    "net_equity": 1000000,  # Default 10L
+    "net_equity": 500000,  # Fixed at 5 Lakhs
+    
+    # Trinity View - Market Structure
+    "vix_ltp": 0.0,
+    "vix_close": 0.0,
+    "spot_ltp": 0.0,
+    "spot_close": 0.0,
+    "fut_curr_ltp": 0.0,
+    "fut_curr_close": 0.0,
+    "fut_next_ltp": 0.0,
+    "fut_next_close": 0.0,
+    "heartbeat": "",
 
     # timing
     "last_update_utc": "",
@@ -517,7 +528,7 @@ def scan_for_model_e():
                 print(f"   VIX: {current_vix:.2f}")
                 
                 # Get VIX & Capital for position sizing
-                net_equity = float(trade_data.get("net_equity", 1000000))  # Default 10L
+                net_equity = float(trade_data.get("net_equity", CAPITAL))  # Fixed at 5 Lakhs
                 lots = get_vaps_lots(current_vix, net_equity)
                 
                 if lots > 0:

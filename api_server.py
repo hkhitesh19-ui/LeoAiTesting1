@@ -390,10 +390,22 @@ async def get_status():
             "symbol": trade_data.get("symbol", "NIFTY FUT"),
             "entry": entry_price,
             "sl": sl_price,
-            "ltp": 25719.0,  # ✅ Now showing live LTP!
-            "close": 25719.0  # Last closing price
+            "ltp": current_ltp,  # ✅ Now showing live LTP!
+            "close": trade_data.get("last_close", 0.0) or 0.0  # Last closing price
         },
-        "tradeHistory": trade_history
+        "tradeHistory": trade_history,
+        # Model E Data
+        "currentVix": trade_data.get("current_vix", 0.0),
+        "currentGear": trade_data.get("current_gear", 0),
+        "gearStatus": trade_data.get("gear_status", "No Trade"),
+        "modelE": {
+            "vix": trade_data.get("current_vix", 0.0),
+            "gear": trade_data.get("current_gear", 0),
+            "gearStatus": trade_data.get("gear_status", "No Trade"),
+            "signal": trade_data.get("model_e_signal", False),
+            "rsi": trade_data.get("model_e_rsi", 0.0),
+            "st_direction": trade_data.get("model_e_st_direction", 0)
+        }
     }
 
 @app.get("/telegram_test")

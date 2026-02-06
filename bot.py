@@ -19,6 +19,25 @@ import pyotp
 # Shoonya API
 from NorenRestApiPy.NorenApi import NorenApi
 
+# Institutional Config
+CAPITAL = 500000.00  # Fixed at 5 Lakhs for Model E blueprint
+FRICTION_PTS = 8.0   # Journaling requirement
+
+# Token Storage
+TOKENS = {
+    "NIFTY_SPOT": "26000",
+    "VIX": "26017",
+    "FUT_CURR": "",
+    "FUT_NEXT": ""
+}
+
+class ShoonyaApiPy(NorenApi):
+    """Shoonya API wrapper with proper initialization"""
+    def __init__(self):
+        NorenApi.__init__(self, 
+                         host='https://prism.shoonya.com/api', 
+                         websocket='wss://prism.shoonya.com/NorenWSToken/')
+
 # Model E Logic
 try:
     from model_e_logic import calculate_model_e_indicators, get_vaps_lots, get_gear_from_vix, get_gear_status
@@ -92,6 +111,7 @@ def _safe_float(x) -> float:
         return 0.0
 
 def shoonya_login() -> bool:
+    """Login to Shoonya API with proper initialization"""
     global api
     UID = os.getenv("SHOONYA_USERID", "")
     PWD = os.getenv("SHOONYA_PASSWORD", "")
@@ -102,7 +122,7 @@ def shoonya_login() -> bool:
         return False
 
     try:
-        api = NorenApi()
+        api = ShoonyaApiPy()
         otp = pyotp.TOTP(TOTP_KEY).now()
         ret = api.login(
             userid=UID, 
@@ -115,6 +135,7 @@ def shoonya_login() -> bool:
 
         if ret and ret.get("stat") == "Ok":
             trade_data["last_error"] = None
+            trade_data["status"] = "LoginOK"
             telegram_send("🟢 Model E Bot: Shoonya login OK")
             return True
 
@@ -125,6 +146,53 @@ def shoonya_login() -> bool:
     except Exception as e:
         trade_data["last_error"] = f"Login exception: {e}"
         return False
+
+def resolve_futures_tokens():
+    """Nifty Current aur Next Month Futures ke tokens find karta hai"""
+    global TOKENS
+    try:
+        # NFO Search for NIFTY Futures
+        ret = api.searchscrip(exchange='NFO', searchtext='NIFTY')
+        if ret and 'values' in ret:
+            # Filter for FUTIDX and sort by expiry
+            futs = [item for item in ret['values'] if item.get('instname') == 'FUTIDX']
+            if futs:
+                # Sort by expiry date
+                futs.sort(key=lambda x: datetime.strptime(x.get('expd', '01-Jan-2000'), '%d-%b-%Y'))
+                
+                TOKENS["FUT_CURR"] = futs[0].get('token', '')
+                if len(futs) > 1:
+                    TOKENS["FUT_NEXT"] = futs[1].get('token', '')
+                
+                print(f"✅ Tokens Resolved: Curr={TOKENS['FUT_CURR']}, Next={TOKENS['FUT_NEXT']}")
+                trade_data["fut_token"] = TOKENS["FUT_CURR"]  # For backward compatibility
+                if futs[0].get('tsym'):
+                    trade_data["symbol"] = futs[0].get('tsym', '')
+    except Exception as e:
+        print(f"⚠️ Token resolution error: {e}")
+        trade_data["last_error"] = f"Token resolution failed: {e}"
+
+def get_market_data() -> Dict[str, Dict[str, float]]:
+    """Spot, Futures aur VIX ka LTP aur Closing Price fetch karta hai"""
+    data = {}
+    try:
+        for key, token in TOKENS.items():
+            if not token:
+                continue
+            exchange = 'NSE' if key in ["NIFTY_SPOT", "VIX"] else 'NFO'
+            res = api.get_quotes(exchange=exchange, token=token)
+            if res and res.get('stat') == 'Ok':
+                ltp = _safe_float(res.get('lp', 0))
+                close = _safe_float(res.get('c', res.get('pc', res.get('close', 0))))
+                if close == 0:
+                    close = ltp  # Fallback to LTP if close not available
+                data[key] = {
+                    "ltp": ltp,
+                    "close": close
+                }
+    except Exception as e:
+        print(f"⚠️ Market data fetch error: {e}")
+    return data
 
 def select_current_month_nifty_fut_token() -> str:
     """Select first NIFTY FUT token from search results."""
@@ -505,19 +573,15 @@ def bot_loop():
 
     trade_data["status"] = "LoginOK"
 
-    # Token selection retry
-    while not _stop_flag:
-        token = select_current_month_nifty_fut_token()
-        if token:
-            break
-        trade_data["status"] = "TokenNotFound"
-        time.sleep(5)
+    # Resolve futures tokens (Current + Next)
+    resolve_futures_tokens()
 
     if _stop_flag:
         trade_data["status"] = "Stopped"
         return
 
     trade_data["status"] = "Running"
+    trade_data["net_equity"] = CAPITAL  # Fixed at 5 Lakhs
     last_log_ts = 0
     last_scan_time = None
     scan_interval = 3600  # 1 hour in seconds
@@ -529,28 +593,58 @@ def bot_loop():
             
             trade_data["last_run"] = datetime.now(timezone.utc).isoformat()
 
-            prices = fetch_quote_prices()
-            ltp = prices["ltp"]
-            close = prices["close"]
-
-            # Update trade_data keys
-            if ltp > 0:
-                trade_data["ltp"] = ltp
-                trade_data["current_ltp"] = ltp
-
-            if close > 0:
-                trade_data["lastClose"] = close
-                trade_data["last_close"] = close
-                t = datetime.now().strftime("%H:%M:%S")
-                trade_data["lastCloseTime"] = t
-                trade_data["last_close_time"] = t
-
+            # Fetch all market data (Trinity View)
+            mkt = get_market_data()
+            
+            # Extract VIX data
+            vix_ltp = mkt.get('VIX', {}).get('ltp', 0)
+            vix_close = mkt.get('VIX', {}).get('close', 0)
+            
+            # Extract Spot data
+            spot_ltp = mkt.get('NIFTY_SPOT', {}).get('ltp', 0)
+            spot_close = mkt.get('NIFTY_SPOT', {}).get('close', 0)
+            
+            # Extract Current Future data
+            fut_curr_ltp = mkt.get('FUT_CURR', {}).get('ltp', 0)
+            fut_curr_close = mkt.get('FUT_CURR', {}).get('close', 0)
+            
+            # Extract Next Future data
+            fut_next_ltp = mkt.get('FUT_NEXT', {}).get('ltp', 0)
+            fut_next_close = mkt.get('FUT_NEXT', {}).get('close', 0)
+            
+            # Update trade_data with Trinity View data (for api_server.py)
+            trade_data["vix_ltp"] = vix_ltp
+            trade_data["vix_close"] = vix_close
+            trade_data["spot_ltp"] = spot_ltp
+            trade_data["spot_close"] = spot_close
+            trade_data["fut_curr_ltp"] = fut_curr_ltp
+            trade_data["fut_curr_close"] = fut_curr_close
+            trade_data["fut_next_ltp"] = fut_next_ltp
+            trade_data["fut_next_close"] = fut_next_close
+            
+            # Backward compatibility keys
+            trade_data["ltp"] = fut_curr_ltp
+            trade_data["current_ltp"] = fut_curr_ltp
+            trade_data["lastClose"] = fut_curr_close
+            trade_data["last_close"] = fut_curr_close
+            
+            # Model E VIX and Gear
+            trade_data["current_vix"] = vix_ltp
+            if MODEL_E_AVAILABLE:
+                trade_data["current_gear"] = get_gear_from_vix(vix_ltp)
+                trade_data["gear_status"] = get_gear_status(vix_ltp)
+            
+            # Update timestamps
+            t = datetime.now().strftime("%H:%M:%S")
+            trade_data["lastCloseTime"] = t
+            trade_data["last_close_time"] = t
             trade_data["last_update_utc"] = datetime.now(timezone.utc).isoformat()
+            trade_data["heartbeat"] = t
 
             now = time.time()
             if now - last_log_ts >= 60:
                 last_log_ts = now
-                print(f"✅ Prices | {trade_data.get('symbol')} ltp={trade_data.get('ltp')} close={trade_data.get('lastClose')}")
+                print(f"✅ Market Data | VIX={vix_ltp:.2f} | Spot={spot_ltp:.2f} | CurrFut={fut_curr_ltp:.2f} | NextFut={fut_next_ltp:.2f}")
 
             # Model E scanning (every 1 hour)
             current_time = time.time()
@@ -559,7 +653,7 @@ def bot_loop():
                     scan_for_model_e()
                 last_scan_time = current_time
 
-            time.sleep(2)
+            time.sleep(3)  # Dashboard refresh sync (3 seconds)
 
         except Exception as e:
             trade_data["last_error"] = str(e)

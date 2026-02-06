@@ -10,10 +10,13 @@
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.3s ease; }
         .glass:hover { border-color: rgba(34, 211, 238, 0.4); box-shadow: 0 0 20px rgba(34, 211, 238, 0.1); }
         .neon-text { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+        .price-up { color: #10b981; }
+        .price-down { color: #ef4444; }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div class="max-w-6xl mx-auto">
+        <!-- Header -->
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
             <div>
                 <h1 class="text-4xl font-black tracking-tighter neon-text text-cyan-400">MODEL E</h1>
@@ -25,10 +28,12 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Top Metrics Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <div class="glass p-6 rounded-3xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Market Volatility (VIX)</p>
                 <h3 id="vix" class="text-3xl font-mono font-bold text-white">--.--</h3>
+                <p id="vix-close" class="text-xs text-gray-400 mt-1">Prev: --.--</p>
             </div>
             <div class="glass p-6 rounded-3xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Active Scaling Gear</p>
@@ -36,7 +41,7 @@
             </div>
             <div class="glass p-6 rounded-3xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Friction Journal</p>
-                <h3 class="text-3xl font-mono font-bold text-red-500">-8.00 Pts</h3>
+                <h3 id="friction" class="text-3xl font-mono font-bold text-red-500">-8.00 Pts</h3>
             </div>
             <div class="glass p-6 rounded-3xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Current Net Equity</p>
@@ -44,38 +49,155 @@
             </div>
         </div>
 
-        <div class="mt-10 text-center">
+        <!-- Trinity View: Market Structure -->
+        <div class="glass p-6 rounded-3xl mb-6">
+            <h2 class="text-lg font-bold text-cyan-400 mb-4 uppercase tracking-wide">Market Structure - Trinity View</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass p-4 rounded-xl">
+                    <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Nifty Spot</p>
+                    <div class="flex justify-between items-baseline">
+                        <h4 id="spot-ltp" class="text-2xl font-bold font-mono">--</h4>
+                        <span id="spot-close" class="text-xs text-gray-400">Prev: --</span>
+                    </div>
+                    <p id="spot-change" class="text-xs mt-1">--</p>
+                </div>
+                <div class="glass p-4 rounded-xl border-l-2 border-cyan-500">
+                    <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Current Future</p>
+                    <div class="flex justify-between items-baseline">
+                        <h4 id="fut-curr-ltp" class="text-2xl font-bold font-mono">--</h4>
+                        <span id="fut-curr-close" class="text-xs text-gray-400">Prev: --</span>
+                    </div>
+                    <p id="fut-curr-change" class="text-xs mt-1">--</p>
+                </div>
+                <div class="glass p-4 rounded-xl">
+                    <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Next Future</p>
+                    <div class="flex justify-between items-baseline">
+                        <h4 id="fut-next-ltp" class="text-2xl font-bold font-mono">--</h4>
+                        <span id="fut-next-close" class="text-xs text-gray-400">Prev: --</span>
+                    </div>
+                    <p id="fut-next-change" class="text-xs mt-1">--</p>
+                </div>
+            </div>
+            <!-- Basis/Spread Info -->
+            <div class="mt-4 pt-4 border-t border-gray-700">
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <span class="text-gray-500">Current Basis:</span>
+                        <span id="curr-basis" class="font-mono font-bold text-cyan-400 ml-2">--</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">Next Basis:</span>
+                        <span id="next-basis" class="font-mono font-bold text-purple-400 ml-2">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Health Indicators -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="glass p-4 rounded-xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Engine Latency</p>
+                <p id="latency" class="text-lg font-mono font-bold text-green-400">-- ms</p>
+            </div>
+            <div class="glass p-4 rounded-xl">
+                <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">API Connectivity</p>
+                <p id="api-status" class="text-lg font-mono font-bold text-green-400">Connected</p>
+            </div>
+        </div>
+
+        <!-- Heartbeat Footer -->
+        <div class="mt-6 text-center">
             <p id="heartbeat" class="text-[10px] text-gray-600 font-mono italic uppercase">Awaiting Data Sync...</p>
         </div>
     </div>
 
     <script>
+        let lastFetchTime = Date.now();
+        
         async function fetchStatus() {
+            const fetchStart = Date.now();
             try {
                 const res = await fetch('/get_status');
                 const data = await res.json();
                 
+                // Calculate latency
+                const latency = Date.now() - fetchStart;
+                document.getElementById('latency').innerText = `${latency} ms`;
+                
                 // Update VIX
-                const vixValue = data.currentVix || data.vix || data.modelE?.vix || 0;
+                const vixValue = data.vix_ltp || data.currentVix || 0;
+                const vixClose = data.vix_close || 0;
                 document.getElementById('vix').innerText = vixValue.toFixed(2);
+                document.getElementById('vix-close').innerText = `Prev: ${vixClose.toFixed(2)}`;
                 
                 // Update Gear
-                const gearStatus = data.gearStatus || data.gear_status || data.modelE?.gearStatus || 'Neutral';
+                const gearStatus = data.gearStatus || data.gear_status || 'Neutral';
                 document.getElementById('gear').innerText = gearStatus;
                 
-                // Update Equity (if available)
+                // Update Equity (Fixed at 5 Lakhs)
                 if (data.equity) {
                     document.getElementById('equity').innerText = data.equity;
                 }
                 
+                // Update Friction
+                if (data.friction) {
+                    document.getElementById('friction').innerText = data.friction;
+                }
+                
+                // Trinity View - Spot
+                const spotLtp = data.spot_ltp || 0;
+                const spotClose = data.spot_close || 0;
+                document.getElementById('spot-ltp').innerText = spotLtp.toFixed(2);
+                document.getElementById('spot-close').innerText = `Prev: ${spotClose.toFixed(2)}`;
+                const spotChange = spotLtp - spotClose;
+                const spotChangeEl = document.getElementById('spot-change');
+                spotChangeEl.innerText = `${spotChange >= 0 ? '+' : ''}${spotChange.toFixed(2)} (${((spotChange/spotClose)*100).toFixed(2)}%)`;
+                spotChangeEl.className = `text-xs mt-1 ${spotChange >= 0 ? 'price-up' : 'price-down'}`;
+                
+                // Trinity View - Current Future
+                const futCurrLtp = data.fut_curr_ltp || data.ltp || 0;
+                const futCurrClose = data.fut_curr_close || data.lastClose || 0;
+                document.getElementById('fut-curr-ltp').innerText = futCurrLtp.toFixed(2);
+                document.getElementById('fut-curr-close').innerText = `Prev: ${futCurrClose.toFixed(2)}`;
+                const futCurrChange = futCurrLtp - futCurrClose;
+                const futCurrChangeEl = document.getElementById('fut-curr-change');
+                futCurrChangeEl.innerText = `${futCurrChange >= 0 ? '+' : ''}${futCurrChange.toFixed(2)} (${((futCurrChange/futCurrClose)*100).toFixed(2)}%)`;
+                futCurrChangeEl.className = `text-xs mt-1 ${futCurrChange >= 0 ? 'price-up' : 'price-down'}`;
+                
+                // Trinity View - Next Future
+                const futNextLtp = data.fut_next_ltp || 0;
+                const futNextClose = data.fut_next_close || 0;
+                document.getElementById('fut-next-ltp').innerText = futNextLtp.toFixed(2);
+                document.getElementById('fut-next-close').innerText = `Prev: ${futNextClose.toFixed(2)}`;
+                const futNextChange = futNextLtp - futNextClose;
+                const futNextChangeEl = document.getElementById('fut-next-change');
+                futNextChangeEl.innerText = `${futNextChange >= 0 ? '+' : ''}${futNextChange.toFixed(2)} (${((futNextChange/futNextClose)*100).toFixed(2)}%)`;
+                futNextChangeEl.className = `text-xs mt-1 ${futNextChange >= 0 ? 'price-up' : 'price-down'}`;
+                
+                // Basis Calculation
+                const currBasis = futCurrLtp - spotLtp;
+                const nextBasis = futNextLtp - spotLtp;
+                document.getElementById('curr-basis').innerText = currBasis.toFixed(2);
+                document.getElementById('next-basis').innerText = nextBasis.toFixed(2);
+                
+                // API Status
+                const apiStatus = data.bot_connected ? 'Connected' : 'Disconnected';
+                const apiStatusEl = document.getElementById('api-status');
+                apiStatusEl.innerText = apiStatus;
+                apiStatusEl.className = `text-lg font-mono font-bold ${data.bot_connected ? 'text-green-400' : 'text-red-400'}`;
+                
                 // Update Heartbeat
                 const engineStatus = data.model_e_active !== false ? 'READY' : 'ERROR';
-                document.getElementById('heartbeat').innerText = `Sync: ${new Date().toLocaleTimeString()} | Engine: ${engineStatus}`;
+                document.getElementById('heartbeat').innerText = `Sync: ${new Date().toLocaleTimeString()} | Engine: ${engineStatus} | Latency: ${latency}ms`;
+                
             } catch (err) {
                 document.getElementById('heartbeat').innerText = "CONNECTION LOST";
+                document.getElementById('api-status').innerText = 'Disconnected';
+                document.getElementById('api-status').className = 'text-lg font-mono font-bold text-red-400';
                 console.error('Status fetch error:', err);
             }
         }
+        
         setInterval(fetchStatus, 3000);
         fetchStatus();
     </script>

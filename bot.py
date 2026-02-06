@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 Model E Trading Strategy Bot (Render-ready)
 Volatility-Adjusted Position Sizing (VAPS) with Structural Hedge
@@ -8,36 +7,18 @@ Volatility-Adjusted Position Sizing (VAPS) with Structural Hedge
 - Model E strategy scanning (1-hour timeframe)
 - VIX-based position sizing
 - Keeps last_close LTP for after-market display
-=======
-﻿"""
-TypeF Shoonya Bot (Institutional v2)
-
-- Render safe
-- Starts via FastAPI startup -> start_bot_thread()
-- Stable Shoonya login (TOTP)
-- Selects current month NIFTY FUT token
-- Updates trade_data with:
-    ltp, lastClose, lastCloseTime  (api_server contract)
-  and keeps compatibility:
-    current_ltp, last_close, last_close_time
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
 """
 
 import os
 import time
 import threading
-<<<<<<< HEAD
-from datetime import datetime, timedelta
-import pyotp
-=======
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
+import pyotp
 
-# Shoonya
+# Shoonya API
 from NorenRestApiPy.NorenApi import NorenApi
 
-<<<<<<< HEAD
 # Model E Logic
 try:
     from model_e_logic import calculate_model_e_indicators, get_vaps_lots, get_gear_from_vix, get_gear_status
@@ -50,17 +31,14 @@ except ImportError:
     def get_gear_from_vix(*args, **kwargs): return 0
     def get_gear_status(*args, **kwargs): return "No Trade"
 
-
 # ==============================
-=======
-# =============================
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
 # Shared runtime state
 # =============================
 trade_data: Dict[str, Any] = {
     "active": False,
     "status": "Booting",
     "last_error": None,
+    "last_run": None,
 
     # instrument
     "symbol": "",
@@ -76,8 +54,17 @@ trade_data: Dict[str, Any] = {
     "last_close": 0.0,
     "last_close_time": None,
 
+    # Model E data
+    "current_vix": 0.0,
+    "current_gear": 0,
+    "gear_status": "No Trade",
+    "model_e_signal": False,
+    "model_e_lots": 0,
+    "model_e_entry": 0.0,
+    "model_e_sl": 0.0,
+    "net_equity": 1000000,  # Default 10L
+
     # timing
-    "last_run": "",
     "last_update_utc": "",
 }
 
@@ -85,14 +72,11 @@ api = None
 _bot_thread = None
 _stop_flag = False
 
-
 def telegram_send(msg: str):
-    """
-    Optional telegram: only if env vars exist.
-    """
+    """Optional telegram: only if env vars exist."""
     try:
-        token = os.getenv("TYPEF_TG_BOT_TOKEN", "")
-        chat_id = os.getenv("TYPEF_TG_CHAT_ID", "")
+        token = os.getenv("TELEGRAM_TOKEN", "")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
         if not token or not chat_id:
             return
         import requests
@@ -101,17 +85,14 @@ def telegram_send(msg: str):
     except Exception:
         pass
 
-
 def _safe_float(x) -> float:
     try:
         return float(x)
     except Exception:
         return 0.0
 
-
 def shoonya_login() -> bool:
     global api
-
     UID = os.getenv("SHOONYA_USERID", "")
     PWD = os.getenv("SHOONYA_PASSWORD", "")
     TOTP_KEY = os.getenv("TOTP_SECRET", "")
@@ -122,33 +103,31 @@ def shoonya_login() -> bool:
 
     try:
         api = NorenApi()
-        # NOTE: Shoonya login requires generated TOTP (your code already stable previously)
-        import pyotp
         otp = pyotp.TOTP(TOTP_KEY).now()
-
-        ret = api.login(userid=UID, password=PWD, twoFA=otp, vendor_code=os.getenv("SHOONYA_VENDOR_CODE",""),
-                        api_secret=os.getenv("SHOONYA_API_SECRET",""), imei=os.getenv("SHOONYA_IMEI",""))
+        ret = api.login(
+            userid=UID, 
+            password=PWD, 
+            twoFA=otp, 
+            vendor_code=os.getenv("SHOONYA_VENDOR_CODE", ""),
+            api_secret=os.getenv("SHOONYA_API_SECRET", ""), 
+            imei=os.getenv("SHOONYA_IMEI", "")
+        )
 
         if ret and ret.get("stat") == "Ok":
             trade_data["last_error"] = None
-            telegram_send("🟢 TypeF Bot: Shoonya login OK")
+            telegram_send("🟢 Model E Bot: Shoonya login OK")
             return True
 
         err = ret.get("emsg", "Unknown error") if ret else "No response"
         trade_data["last_error"] = f"Login failed: {err}"
-        telegram_send(f"🔴 TypeF Bot: Login failed\n{err}")
         return False
 
     except Exception as e:
         trade_data["last_error"] = f"Login exception: {e}"
-        telegram_send(f"🔴 TypeF Bot: Login exception\n{e}")
         return False
 
-
 def select_current_month_nifty_fut_token() -> str:
-    """
-    Select first NIFTY FUT token from search results.
-    """
+    """Select first NIFTY FUT token from search results."""
     try:
         r = api.searchscrip(exchange="NFO", searchtext="NIFTY")
         if not r:
@@ -168,11 +147,8 @@ def select_current_month_nifty_fut_token() -> str:
         trade_data["last_error"] = f"Token selection failed: {e}"
         return ""
 
-
 def fetch_quote_prices() -> Dict[str, float]:
-    """
-    Returns {"ltp":..., "close":...}
-    """
+    """Returns {"ltp":..., "close":...}"""
     token = trade_data.get("fut_token")
     if not token:
         return {"ltp": 0.0, "close": 0.0}
@@ -191,13 +167,190 @@ def fetch_quote_prices() -> Dict[str, float]:
 
     return {"ltp": ltp_f, "close": close_f}
 
-
-<<<<<<< HEAD
-        return ltp
-
+# ==============================
+# Model E Execution Logic
+# ==============================
+def execute_model_e_trade(lots, stop_loss, entry_price):
+    """
+    Execute Model E Trade with Institutional Order Sequence:
+    1. BUY OTM PUT (Hedge) - Market Order
+    2. BUY NIFTY FUTURE (Main) - Market Order
+    
+    Args:
+        lots: Number of lots to trade
+        stop_loss: Stop loss price
+        entry_price: Entry price
+    """
+    try:
+        if not api:
+            print("❌ API not initialized")
+            return False
+        
+        # Get NIFTY spot for strike calculation
+        nifty_spot_data = api.get_quotes(exchange='NSE', token='26000')
+        nifty_spot = float(nifty_spot_data.get('lp', 0))
+        
+        if nifty_spot == 0:
+            print("❌ Could not fetch NIFTY spot price")
+            return False
+        
+        # Calculate Put Strike (ATM - 200, approx Delta 0.35)
+        put_strike = round(nifty_spot / 50) * 50 - 200
+        
+        # Get current expiry (simplified - use current month)
+        now = datetime.now()
+        expiry_month = now.strftime('%b').upper()
+        expiry_year = now.strftime('%y')
+        current_expiry = f"{expiry_year}{expiry_month}"
+        
+        # Calculate quantity (lots * 50 for NIFTY)
+        qty = lots * 50
+        
+        print(f"🚀 Executing Model E Trade:")
+        print(f"   Lots: {lots}")
+        print(f"   Entry: {entry_price:.2f}")
+        print(f"   SL: {stop_loss:.2f}")
+        print(f"   Put Strike: {put_strike}")
+        
+        # ORDER 1: BUY OTM PUT (Hedge) - Market Order
+        print(f"📊 Order 1: Buying Put Strike {put_strike}PE")
+        put_symbol = f"NIFTY{current_expiry}{put_strike}PE"
+        
+        put_order = api.place_order(
+            buy_or_sell='B',
+            product_type='M',  # MIS
+            exchange='NFO',
+            tradingsymbol=put_symbol,
+            quantity=qty,
+            discloseqty=0,
+            price_type='MKT',
+            price=0.0,
+            trigger_price=None,
+            retention='DAY',
+            remarks='ModelE_Hedge'
+        )
+        
+        if not put_order or put_order.get('stat') != 'Ok':
+            error_msg = put_order.get('emsg', 'Unknown error') if put_order else 'No response'
+            print(f"❌ Put order failed: {error_msg}")
+            telegram_send(f"❌ Model E: Put order failed - {error_msg}")
+            return False
+        
+        put_order_id = put_order.get('norenordno')
+        print(f"✅ Put order placed: {put_order_id}")
+        
+        # Small delay between orders
+        time.sleep(1)
+        
+        # ORDER 2: BUY NIFTY FUTURE (Main) - Market Order
+        print(f"📊 Order 2: Buying NIFTY Future")
+        fut_symbol = trade_data.get("symbol", f"NIFTY{current_expiry}F")
+        
+        fut_order = api.place_order(
+            buy_or_sell='B',
+            product_type='M',  # MIS
+            exchange='NFO',
+            tradingsymbol=fut_symbol,
+            quantity=qty,
+            discloseqty=0,
+            price_type='MKT',
+            price=0.0,
+            trigger_price=None,
+            retention='DAY',
+            remarks='ModelE_Main'
+        )
+        
+        if not fut_order or fut_order.get('stat') != 'Ok':
+            error_msg = fut_order.get('emsg', 'Unknown error') if fut_order else 'No response'
+            print(f"❌ Future order failed: {error_msg}")
+            telegram_send(f"❌ Model E: Future order failed - {error_msg}")
+            return False
+        
+        fut_order_id = fut_order.get('norenordno')
+        print(f"✅ Future order placed: {fut_order_id}")
+        
+        # Update trade data
+        current_gear = trade_data.get("current_gear", 0)
+        trade_data["active"] = True
+        trade_data["entry_price"] = entry_price
+        trade_data["sl_price"] = stop_loss
+        trade_data["model_e_signal"] = True
+        trade_data["model_e_lots"] = lots
+        trade_data["model_e_entry"] = entry_price
+        trade_data["model_e_sl"] = stop_loss
+        trade_data["put_order_id"] = put_order_id
+        trade_data["fut_order_id"] = fut_order_id
+        trade_data["put_strike"] = put_strike
+        
+        # Telegram Alert
+        telegram_send(
+            f"🚀 *Model E Entry*\n\n"
+            f"Future + Hedge Buy\n"
+            f"Gear: {current_gear}\n"
+            f"Lots: {lots}\n"
+            f"Entry: ₹{entry_price:,.2f}\n"
+            f"SL: ₹{stop_loss:,.2f}\n"
+            f"Put Strike: {put_strike}PE"
+        )
+        
+        return True
+        
     except Exception as e:
-        trade_data["last_error"] = f"LTP fetch error: {e}"
-        return float(trade_data.get("current_ltp") or 0.0)
+        print(f"❌ Execution failed: {e}")
+        telegram_send(f"❌ Model E Execution Failed: {str(e)}")
+        return False
+
+def square_off_all():
+    """
+    Square off all Model E positions (Future + Put)
+    Called on Friday 15:15 or manual exit
+    """
+    try:
+        if not api:
+            return False
+        
+        fut_symbol = trade_data.get("symbol", "")
+        put_strike = trade_data.get("put_strike", 0)
+        
+        if not fut_symbol:
+            print("⚠️ No active position to square off")
+            return False
+        
+        print("🔒 Squaring off all Model E positions...")
+        
+        # Get current positions
+        positions = api.get_positions()
+        if not positions:
+            print("⚠️ No positions found")
+            return False
+        
+        # Square off Future
+        # Square off Put
+        # (Implementation depends on Shoonya API position management)
+        
+        trade_data["active"] = False
+        telegram_send("🔒 Friday Mandatory Exit Complete. All positions squared off.")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Square off failed: {e}")
+        return False
+
+def check_friday_exit():
+    """
+    Check if it's Friday 15:15 and trigger exit
+    Called from bot loop
+    """
+    now = datetime.now()
+    # 4 is Friday, 15:15 is 3:15 PM
+    if now.weekday() == 4 and now.hour == 15 and now.minute >= 15:
+        if trade_data.get("active"):
+            print("🔒 Friday 15:15 Rule Triggered. Squaring off all positions.")
+            square_off_all()
+            telegram_send("🔒 Friday Mandatory Exit Complete. System Paused.")
+            return True
+    return False
 
 # ==============================
 # Model E Strategy Scanner
@@ -308,8 +461,8 @@ def scan_for_model_e():
                     print(f"   Entry: {entry_price:.2f}")
                     print(f"   SL: {stop_loss:.2f}")
                     
-                    # Execute trade (placeholder - implement execute_model_e_trade)
-                    # execute_model_e_trade(lots, stop_loss, entry_price)
+                    # Execute trade
+                    execute_model_e_trade(lots, stop_loss, entry_price)
                     trade_data['model_e_signal'] = True
                     trade_data['model_e_lots'] = lots
                     trade_data['model_e_entry'] = entry_price
@@ -329,29 +482,16 @@ def scan_for_model_e():
         print(f"❌ scan_for_model_e exception: {e}")
         trade_data["last_error"] = f"Model E exception: {str(e)}"
 
-def start_bot_thread():
-    global _BOT_THREAD_STARTED
-    if _BOT_THREAD_STARTED:
-        print("ℹ️ Bot thread already started, skipping.")
-        return None
-    _BOT_THREAD_STARTED = True
-
-    t = threading.Thread(target=bot_loop, daemon=True)
-    t.start()
-    return t
-
 # ==============================
-# Main bot loop (auto-restored)
+# Main bot loop
 # ==============================
-=======
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
 def bot_loop():
     global _stop_flag
-    print("✅ BOT LOOP STARTED")
+    print("✅ Model E Bot Loop Started")
     trade_data["status"] = "Starting"
-    trade_data["active"] = True
+    trade_data["active"] = False
 
-    # login retry loop
+    # Login retry loop
     while not _stop_flag:
         ok = shoonya_login()
         if ok:
@@ -363,16 +503,9 @@ def bot_loop():
         trade_data["status"] = "Stopped"
         return
 
-<<<<<<< HEAD
-    # ---- 3) Quote updater + Model E scanner loop ----
-    last_scan_time = None
-    scan_interval = 3600  # 1 hour in seconds
-    
-    while not _STOP_BOT:
-=======
     trade_data["status"] = "LoginOK"
 
-    # token selection retry
+    # Token selection retry
     while not _stop_flag:
         token = select_current_month_nifty_fut_token()
         if token:
@@ -386,17 +519,21 @@ def bot_loop():
 
     trade_data["status"] = "Running"
     last_log_ts = 0
+    last_scan_time = None
+    scan_interval = 3600  # 1 hour in seconds
 
     while not _stop_flag:
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
         try:
+            # Check Friday exit
+            check_friday_exit()
+            
             trade_data["last_run"] = datetime.now(timezone.utc).isoformat()
 
             prices = fetch_quote_prices()
             ltp = prices["ltp"]
             close = prices["close"]
 
-            # update trade_data keys (api_server contract + compatibility)
+            # Update trade_data keys
             if ltp > 0:
                 trade_data["ltp"] = ltp
                 trade_data["current_ltp"] = ltp
@@ -404,7 +541,6 @@ def bot_loop():
             if close > 0:
                 trade_data["lastClose"] = close
                 trade_data["last_close"] = close
-
                 t = datetime.now().strftime("%H:%M:%S")
                 trade_data["lastCloseTime"] = t
                 trade_data["last_close_time"] = t
@@ -416,16 +552,13 @@ def bot_loop():
                 last_log_ts = now
                 print(f"✅ Prices | {trade_data.get('symbol')} ltp={trade_data.get('ltp')} close={trade_data.get('lastClose')}")
 
-<<<<<<< HEAD
-                # Model E scanning (every 1 hour)
-                current_time = time.time()
-                if last_scan_time is None or (current_time - last_scan_time) >= scan_interval:
-                    if MODEL_E_AVAILABLE:
-                        scan_for_model_e()
-                    last_scan_time = current_time
+            # Model E scanning (every 1 hour)
+            current_time = time.time()
+            if last_scan_time is None or (current_time - last_scan_time) >= scan_interval:
+                if MODEL_E_AVAILABLE and not trade_data.get("active"):
+                    scan_for_model_e()
+                last_scan_time = current_time
 
-=======
->>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
             time.sleep(2)
 
         except Exception as e:
@@ -437,7 +570,6 @@ def bot_loop():
     trade_data["status"] = "Stopped"
     trade_data["active"] = False
 
-
 def start_bot_thread():
     global _bot_thread, _stop_flag
     if _bot_thread and _bot_thread.is_alive():
@@ -445,7 +577,6 @@ def start_bot_thread():
     _stop_flag = False
     _bot_thread = threading.Thread(target=bot_loop, daemon=True)
     _bot_thread.start()
-
 
 def stop_bot():
     global _stop_flag

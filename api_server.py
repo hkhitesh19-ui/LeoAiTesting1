@@ -119,8 +119,12 @@ def get_status_strict(response: Response):
     pnl_percentage = 0.0
     
     if active and entry_price > 0 and current_ltp > 0:
-        # Calculate P&L (assuming 1 lot for now)
-        today_pnl = current_ltp - entry_price
+        # Calculate P&L with Friction Journal (8 points per lot)
+        # Net P&L = (LTP - Entry) - (8 points × Lots)
+        lots = trade_data.get("model_e_lots", 1) or 1
+        friction_points = 8 * lots
+        raw_pnl = current_ltp - entry_price
+        today_pnl = raw_pnl - friction_points  # Institutional grade P&L
         pnl_percentage = ((current_ltp - entry_price) / entry_price) * 100
     
     # Get trade history (if bot.py has it)

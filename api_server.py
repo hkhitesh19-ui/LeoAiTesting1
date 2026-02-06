@@ -1,33 +1,19 @@
-from dotenv import load_dotenv
-load_dotenv()
+﻿import os
+import time
+import threading
+from datetime import datetime, timezone
+from typing import Optional, Any, Dict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
-import os
-
-app = FastAPI()
+from pydantic import BaseModel, Field
 
 
+# =========================
+# App init
+# =========================
+app = FastAPI(title="TypeF Backend API", version="1.0")
 
-
-
-_BOT_THREAD = None
-
-@app.api_route("/", methods=["GET","HEAD"])
-def root():
-    return {"status": "ok"}
-
-@app.on_event("startup")
-async def startup_event():
-    try:
-        from bot import start_bot_thread
-        start_bot_thread()
-        print("✅ Bot auto-started on API startup")
-    except Exception as e:
-        print("⚠️ Bot auto-start failed:", e)
-
-# CORS for Netlify frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,339 +22,100 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import bot runtime state
-BOT_CONNECTED = False
-trade_data = None
+# =========================
+# Admin Auth
+# =========================
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
+
+def require_admin_token(x_admin_token: str | None):
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN not set on server")
+    if not x_admin_token or x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# =========================
+# Optional bot import
+# =========================
+bot = None
 try:
-    import bot  # auto-starts bot thread
-    trade_data = bot.trade_data
-    BOT_CONNECTED = True
-    print("✅ bot.py connected: trade_data imported")
+    import bot as bot_module
+    bot = bot_module
 except Exception as e:
-    BOT_CONNECTED = False
-    trade_data = {
-        "active": False,
-        "last_run": None,
-        "last_error": f"bot import failed: {e}",
-        "symbol": "NIFTY FUT",
-        "fut_token": None,
-        "entry_price": 0.0,
-        "sl_price": 0.0,
-        "current_ltp": 0.0,
-        "last_close": 0.0,
-        "trade_history": [],
-    }
-    print(f"⚠️ bot.py import failed: {e}")
+    bot = None
 
 
-def safe_float(x) -> float:
-    try:
-        return float(x or 25719.0)
-    except Exception:
-        return 0.0
+# =========================
+# Models
+# =========================
+class BotStatusModel(BaseModel):
+    status: str = "Searching"
+    message: str = ""
 
 
-def safe_get_live_ltp() -> float:
-    """
-    Prefer live LTP via bot.get_live_ltp() else fallback last_close.
-    This ensures AFTER MARKET also some price shown.
-    """
-    try:
-        if BOT_CONNECTED:
-            ltp = safe_float(bot.get_live_ltp())
-            if ltp > 0:
-                return ltp
-    except Exception:
-        pass
-
-    # fallback
-    return safe_float(trade_data.get("last_close", 25719.0))
+class StatusResponse(BaseModel):
+    version: str = "unknown"
+    build_time: str = ""
+    server_time: str = ""
+    bot_connected: bool = False
+    botStatus: BotStatusModel = Field(default_factory=BotStatusModel)
+    todayPnl: float = 0.0
+    pnlPercentage: float = 0.0
+    ltp: float = 0.0
+    lastClose: float = 0.0
+    lastCloseTime: str = ""
 
 
-@app.get("/")
-async def root():
-    return {"ok": True, "service": "Type F API", "time": datetime.now().isoformat()}
+# =========================
+# Build metadata
+# =========================
+def _git_commit_short() -> str:
+    # Render injects RENDER_GIT_COMMIT; fallback to env
+    commit = os.getenv("RENDER_GIT_COMMIT", "") or os.getenv("GIT_COMMIT", "")
+    if commit:
+        return commit[:7]
+    return "unknown"
 
 
-@app.get("/health")
-async def health():
+BUILD_TIME = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+# =========================
+# Health / Version
+# =========================
+@app.get("/health", tags=["system"])
+def health():
+    return {"ok": True}
+
+
+@app.get("/version", tags=["system"])
+def version():
     return {
-        "ok": True,
-        "bot_connected": BOT_CONNECTED,
-        "timestamp": datetime.now().isoformat(),
-        "last_run": trade_data.get("last_run"),
-        "last_error": trade_data.get("last_error"),
+        "render_git_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
+        "build_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
+        "build_time": BUILD_TIME,
+        "server_time": datetime.now(timezone.utc).isoformat(),
     }
 
 
-@app.get("/get_status")
-async def get_status():
-    """
-    Frontend dashboard endpoint
-    """
-    try:
-        active = bool(trade_data.get("active", False))
+# =========================
+# Status API (STRICT JSON)
+# =========================
+@app.get("/get_status", response_model=StatusResponse, tags=["dashboard"])
+def get_status_strict(response: Response):
+    response.headers["Cache-Control"] = "no-store"
 
-        entry = safe_float(trade_data.get("entry_price"))
-        sl = safe_float(trade_data.get("sl_price"))
+    # base values
+    bot_connected = False
+    bot_status = "Disconnected"
+    bot_msg = "Bot not running"
 
-        ltp_val = safe_get_live_ltp()
-
-        today_pnl = 0.0
-        pnl_pct = 0.0
-
-        if active and entry > 0 and ltp_val > 0:
-            today_pnl = ltp_val - entry
-            pnl_pct = ((ltp_val - entry) / entry) * 100.0
-
-        history = trade_data.get("trade_history") or []
-        if not isinstance(history, list):
-            history = []
-
-        return {
-            "botStatus": {
-                "status": "Active" if active else "Searching",
-                "message": "Market Open" if active else "Scanning",
-            },
-            "todayPnl": round(today_pnl, 2),
-            "pnlPercentage": round(pnl_pct, 3),
-            "activeTrade": {
-    "symbol": "NIFTY FUT",
-    "entry": float(trade_data.get("entry_price", 25719.0)),
-    "sl": float(trade_data.get("sl_price", 25719.0)),
-    "ltp": 25719.0,
-    "close": 25719.0,
-    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 25719.0)
-},
-            "tradeHistory": history[:50],
-        }
-
-    except Exception as e:
-        # never crash
-        return {
-            "botStatus": {"status": "Error", "message": "API error"},
-            "todayPnl": 0.0,
-            "pnlPercentage": 0.0,
-            "activeTrade": {
-    "symbol": "NIFTY FUT",
-    "entry": float(trade_data.get("entry_price", 25719.0)),
-    "sl": float(trade_data.get("sl_price", 25719.0)),
-    "ltp": 25719.0,
-    "close": 25719.0,
-    "display_ltp": float(trade_data.get("current_ltp") or trade_data.get("last_close") or 25719.0)
-},
-            "tradeHistory": [],
-            "error": str(e),
-        }
-
-
-
-
-
-@app.get('/health')
-@app.head('/health')
-async def health_check():
-    return {'status': 'healthy'}
-
-
-
-
-
-
-
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    print("🛑 Shutdown event triggered (Render TERM). Stopping bot safely...")
-    try:
-        import bot
-        if hasattr(bot, "stop_bot"):
-            bot.stop_bot()
-            print("✅ bot.stop_bot() called")
-        else:
-            print("⚠️ bot.stop_bot() not found")
-    except Exception as e:
-        print(f"❌ Error in stop_bot: {e}")
-
-def send_trade_entry_alert(symbol, price, sl, strategy="Type F"):
-    """Entry alert with formatted message"""
-    message = f"""🚀 *STRATEGY ALERT: ENTRY*
-
-*Strategy:* {strategy}
-*Symbol:* {symbol}
-*Entry Price:* ₹{price:,.2f}
-*Stop Loss:* ₹{sl:,.2f}
-*Risk:* ₹{abs(price - sl):,.2f}
-
-_Time:_ {datetime.now().strftime('%I:%M:%S %p')}
-"""
-    return send_telegram_alert(message)
-
-def send_trade_exit_alert(symbol, entry, exit, pnl, reason="Target Hit"):
-    """Exit alert with P&L"""
-    pnl_emoji = "✅" if pnl >= 0 else "❌"
-    message = f"""{pnl_emoji} *STRATEGY ALERT: EXIT*
-
-*Symbol:* {symbol}
-*Entry:* ₹{entry:,.2f}
-*Exit:* ₹{exit:,.2f}
-*P&L:* ₹{pnl:,.2f}
-*Reason:* {reason}
-
-_Time:_ {datetime.now().strftime('%I:%M:%S %p')}
-"""
-    return send_telegram_alert(message)
-
-def send_error_alert(error_message):
-    """Critical error alert"""
-    message = f"""🔴 *BOT ERROR ALERT*
-
-*Error:* {error_message}
-*Time:* {datetime.now().strftime('%I:%M:%S %p')}
-
-_Please check the logs immediately!_
-"""
-    return send_telegram_alert(message)
-
-# ==========================================
-# FastAPI Application
-# ==========================================
-
-app = FastAPI()
-
-# CORS middleware - Allows frontend to connect
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
-# ==========================================
-# Import trade_data and API from bot.py
-# ==========================================
-
-# Try to import from bot.py (if bot is running)
-try:
-    from bot import trade_data, api
-    print("✅ Successfully imported trade_data and api from bot.py")
-    BOT_CONNECTED = True
-except ImportError:
-    print("⚠️ bot.py not found. Using mock trade_data.")
-    # Mock trade_data for standalone API server
-    trade_data = {
-        "active": False,
-        "last_run": None,
-        "last_error": None,
-        "entry_price": 0.0,
-        "sl_price": 0.0,
-        "fut_token": None,
-        "symbol": "NIFTY FUT",
-    }
-    api = None
-    BOT_CONNECTED = False
-
-@app.get("/")
-async def root():
-    return {"message": "Type F Trading Bot API", "status": "online"}
-
-@app.get("/start")
-async def start_bot():
-    """
-    Manually start/restart the bot
-    Returns current bot status
-    """
-    return {
-        "ok": True,
-        "message": "Bot started" if BOT_CONNECTED else "Bot starting...",
-        "bot_connected": BOT_CONNECTED,
-        "status": "running" if trade_data.get("active") else "scanning"
-    }
-
-@app.get("/health")
-async def health():
-    """
-    Health check endpoint with detailed status
-    """
-    active = trade_data.get("active", False)
-    entry_price = float(trade_data.get("entry_price", 25719.0) or 25719.0)
-    
-    return {
-        "ok": True,
-        "running": active,
-        "bot_connected": BOT_CONNECTED,
-        "last_run": trade_data.get("last_run"),
-        "last_error": trade_data.get("last_error"),
-        "has_active_trade": active and entry_price > 0,
-        "timestamp": datetime.now().isoformat()
-    }
-
-def get_live_ltp():
-    """
-    Fetch live LTP from Shoonya API
-    Returns current market price or 0.0 if not available
-    Also stores last close price in trade_data
-    """
-    if not BOT_CONNECTED or api is None:
-        return 0.0
-    
-    try:
-        # Get token from trade_data
-        token = trade_data.get("fut_token")
-        if not token:
-            return 0.0
-        
-        # Fetch live quote from Shoonya
-        res = api.get_quotes(exchange='NFO', token=str(token))
-        
-        if res:
-            # Get LTP
-            ltp = float(res.get('lp', 25719.0))
-            
-            # Get close price (previous day's closing)
-            close_price = float(res.get('pc', res.get('c', 25719.0))) or float(res.get('close', 25719.0)) or 0.0
-            
-            # Store close price in trade_data
-            if close_price > 0:
-                trade_data["last_close"] = close_price
-            
-            if ltp > 0:
-                print(f"✅ Live LTP fetched: ₹{ltp:,.2f}, Close: ₹{close_price:,.2f}")
-                return ltp
-            else:
-                print(f"⚠️ LTP not found in response")
-                return 0.0
-        else:
-            print(f"⚠️ No response from API")
-            return 0.0
-            
-    except Exception as e:
-        print(f"❌ Error fetching LTP: {e}")
-        return 0.0
-
-@app.get("/get_status")
-async def get_status():
-    """
-    Dashboard endpoint - returns current bot status and trade data
-    This endpoint is called by the frontend dashboard every 5 seconds
-    
-    Features:
-    - Live LTP from Shoonya API
-    - Real-time P&L calculation
-    - Trade history from bot
-    """
-    active = trade_data.get("active", False)
-    entry_price = float(trade_data.get("entry_price", 25719.0) or 25719.0)
-    sl_price = float(trade_data.get("sl_price", 25719.0) or 25719.0)
-    
-    # Fetch live LTP from Shoonya
-    current_ltp = get_live_ltp()
-    
-    # Calculate today's P&L if trade is active
+    ltp = 0.0
+    last_close = 0.0
+    last_close_time = ""
     today_pnl = 0.0
+<<<<<<< HEAD
     pnl_percentage = 0.0
     
     if active and entry_price > 0 and current_ltp > 0:
@@ -407,53 +154,100 @@ async def get_status():
             "st_direction": trade_data.get("model_e_st_direction", 0)
         }
     }
+=======
+    pnl_pct = 0.0
+>>>>>>> 1dc31967a729137b9f9419ddceeaf5021372be03
 
-@app.get("/telegram_test")
-async def telegram_test():
-    """Test endpoint to verify Telegram alerts are working"""
-    success = send_telegram_alert("🧪 *Test Alert*\n\nTelegram integration is working! ✅")
-    
-    if success:
-        return {
-            "status": "success",
-            "message": "Telegram alert sent successfully! Check your phone.",
-            "telegram_configured": True
-        }
-    else:
-        return {
-            "status": "error",
-            "message": "Failed to send Telegram alert. Check credentials.",
-            "telegram_configured": False,
-            "help": "Set TELEGRAM_TOKEN and TELEGRAM_CHAT_ID environment variables on Render"
-        }
+    # try pull trade_data from bot if available
+    if bot is not None:
+        try:
+            td: Dict[str, Any] = getattr(bot, "trade_data", {}) or {}
 
-# ==========================================
-# Example Usage in Your Trading Bot
-# ==========================================
+            # Connection inference
+            # bot.trade_data should contain status like Running/LoginOK etc.
+            runtime_status = str(td.get("status") or "").strip()
+            is_ok = runtime_status.lower() in ["running", "loginok", "connected", "active"]
 
-"""
-# When trade is executed:
-send_trade_entry_alert(
-    symbol="NIFTY FUT",
-    price=21500.00,
-    sl=21400.00,
-    strategy="Type F"
-)
+            bot_connected = bool(td.get("connected", False)) or is_ok
 
-# When trade exits:
-send_trade_exit_alert(
-    symbol="NIFTY FUT",
-    entry=21500.00,
-    exit=21650.00,
-    pnl=150.00,
-    reason="Target Hit"
-)
+            if bot_connected:
+                bot_status = runtime_status or "Running"
+                bot_msg = "Bot OK"
+            else:
+                bot_status = "Disconnected"
+                bot_msg = runtime_status or "Bot Disconnected"
 
-# On critical errors:
-send_error_alert("Failed to place order - Connection timeout")
+            # Numeric fields
+            def _f(x, default=0.0):
+                try:
+                    return float(x)
+                except Exception:
+                    return float(default)
 
-# Custom message:
-send_telegram_alert("📊 *Daily Report*\n\nTotal P&L: ₹5,000\nTrades: 3")
-"""
+            ltp = _f(td.get("ltp", 0))
+            last_close = _f(td.get("lastClose", 0))
+            last_close_time = str(td.get("lastCloseTime", "") or "")
+            today_pnl = _f(td.get("todayPnl", 0))
+            pnl_pct = _f(td.get("pnlPercentage", 0))
 
-# To run locally: uvicorn api_server:app --reload --host 0.0.0.0 --port 8000
+        except Exception as e:
+            bot_connected = False
+            bot_status = "Error"
+            bot_msg = f"Bot exception: {e}"
+
+    payload = StatusResponse(
+        version=_git_commit_short(),
+        build_time=BUILD_TIME,
+        server_time=datetime.now(timezone.utc).isoformat(),  # ✅ UTC timezone-aware
+        bot_connected=bot_connected,
+        botStatus=BotStatusModel(status=bot_status, message=bot_msg),
+        todayPnl=today_pnl,
+        pnlPercentage=pnl_pct,
+        ltp=ltp,
+        lastClose=last_close,
+        lastCloseTime=last_close_time,
+    )
+    return payload
+
+
+# =========================
+# Admin Recovery Endpoints
+# =========================
+@app.post("/admin/restart_bot", tags=["admin"])
+def admin_restart_bot(x_admin_token: str | None = Header(default=None, alias="X-ADMIN-TOKEN")):
+    require_admin_token(x_admin_token)
+
+    if bot is None:
+        raise HTTPException(status_code=500, detail="bot module not loaded")
+
+    try:
+        # stop if exists
+        if hasattr(bot, "stop_bot"):
+            try:
+                bot.stop_bot()
+            except Exception:
+                pass
+
+        # start thread
+        if hasattr(bot, "start_bot_thread"):
+            bot.start_bot_thread()
+        else:
+            raise HTTPException(status_code=500, detail="bot.start_bot_thread missing")
+
+        return {"ok": True, "message": "Bot restart triggered"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Restart bot failed: {e}")
+
+
+@app.post("/admin/restart_service", tags=["admin"])
+def admin_restart_service(x_admin_token: str | None = Header(default=None, alias="X-ADMIN-TOKEN")):
+    require_admin_token(x_admin_token)
+
+    def _exit():
+        time.sleep(1)
+        os._exit(0)
+
+    threading.Thread(target=_exit, daemon=True).start()
+    return {"ok": True, "message": "Service restart triggered"}
+

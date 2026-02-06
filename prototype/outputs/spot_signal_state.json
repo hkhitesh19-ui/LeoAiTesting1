@@ -1,0 +1,9 @@
+{
+  "signal": "WAIT",
+  "reason": "Trend conditions not satisfied",
+  "spot_close": 25064,
+  "ema20": 25215,
+  "rsi19": 58,
+  "supertrend": 25180,
+  "ts": "2026-01-25T05:16:10.451188Z"
+}

@@ -43,3 +43,15 @@ Thumbs.db
 # Documentation (optional - uncomment to exclude)
 # *.md
 # !README.md
+patch_*.py
+schemas.py
+
+close_store.py
+
+_backups/
+
+prepush_check.ps1
+
+_guard_backups/
+*.bak_*
+

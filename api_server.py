@@ -37,7 +37,7 @@ def require_admin_token(x_admin_token: str | None):
 
 
 # =========================
-# Bot import and startup
+# Bot import
 # =========================
 bot = None
 try:
@@ -47,23 +47,6 @@ try:
 except Exception as e:
     print(f"⚠️ Bot import failed: {e}")
     bot = None
-
-# =========================
-# Startup Event - Start Bot Loop
-# =========================
-@app.on_event("startup")
-async def startup_event():
-    """Start bot loop in background thread on server startup"""
-    if bot is not None:
-        try:
-            # Start bot loop in background thread (daemon=True so it stops with server)
-            bot_thread = threading.Thread(target=bot.bot_loop, daemon=True)
-            bot_thread.start()
-            print("✅ Bot loop started in background thread")
-        except Exception as e:
-            print(f"⚠️ Failed to start bot loop: {e}")
-    else:
-        print("⚠️ Bot module not available - bot loop not started")
 
 # =========================
 # Model E Logic Import

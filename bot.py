@@ -608,8 +608,12 @@ def scan_for_model_e():
                 vix_data = api.get_quotes(exchange='NSE', token=vix_token)
                 current_vix = float(vix_data.get('lp', 0))
                 trade_data['current_vix'] = current_vix
-                trade_data['current_gear'] = get_gear_from_vix(current_vix)
+                new_gear = get_gear_from_vix(current_vix)
+                trade_data['current_gear'] = new_gear
                 trade_data['gear_status'] = get_gear_status(current_vix)
+                
+                # Check for gear change and send Telegram alert
+                check_gear_change(current_vix, new_gear)
             except Exception as e:
                 print(f"⚠️ VIX fetch error: {e}")
                 current_vix = 0

@@ -12,6 +12,9 @@ Volatility-Adjusted Position Sizing (VAPS) with Structural Hedge
 import os
 import time
 import threading
+import json
+import hashlib
+import requests
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 import pyotp
@@ -121,8 +124,62 @@ def _safe_float(x) -> float:
     except Exception:
         return 0.0
 
+def shoonya_login_direct_http():
+    """Returns (success: bool, result: str) where result is susertoken on success or error message on failure"""
+    """Direct HTTP login with correct payload format (uid, factor2) - Master Integration"""
+    UID = os.getenv("SHOONYA_USERID", "")
+    PWD = os.getenv("SHOONYA_PASSWORD", "")
+    TOTP_KEY = os.getenv("TOTP_SECRET", "")
+    VC = os.getenv("SHOONYA_VENDOR_CODE", "")
+    API_SECRET = os.getenv("SHOONYA_API_SECRET", "")
+    IMEI = os.getenv("SHOONYA_IMEI", "")
+
+    if not UID or not PWD or not TOTP_KEY:
+        return False, "Missing env vars: SHOONYA_USERID/SHOONYA_PASSWORD/TOTP_SECRET"
+
+    try:
+        # Generate TOTP
+        totp = pyotp.TOTP(TOTP_KEY).now()
+        
+        # Correct Payload Mapping for Shoonya Business API
+        # Status 400 fix: Use 'uid' instead of 'userid', 'factor2' instead of 'tfa'
+        payload = {
+            "stats": "Ok",
+            "uid": UID,  # ✅ Correct key name
+            "pwd": hashlib.sha256(PWD.encode()).hexdigest(),
+            "factor2": totp,  # ✅ Correct key name (not 'tfa' or 'twoFA')
+            "vc": VC,
+            "appkey": hashlib.sha256(f"{UID}|{API_SECRET}".encode()).hexdigest(),
+            "imei": IMEI,
+            "source": "API"
+        }
+        
+        # Shoonya API endpoint - Use correct endpoint
+        # Note: NorenApi uses 'prism.shoonya.com/api' but direct HTTP may need different endpoint
+        # Try standard endpoint first
+        BASE_URL = "https://prism.shoonya.com/api"
+        url = f"{BASE_URL}/QuickAuth"
+        
+        # Send request with correct format
+        res = requests.post(url, data=f'jData={json.dumps(payload)}', 
+                           headers={"Content-Type": "application/x-www-form-urlencoded"}, 
+                           timeout=15)
+        
+        result = res.json()
+        
+        if result.get("stat") == "Ok":
+            # Store susertoken for future API calls
+            susertoken = result.get("susertoken", "")
+            return True, susertoken
+        else:
+            err = result.get("emsg", "Unknown error")
+            return False, f"Login failed: {err}"
+            
+    except Exception as e:
+        return False, f"Login exception: {e}"
+
 def shoonya_login() -> bool:
-    """Login to Shoonya API with proper initialization"""
+    """Login to Shoonya API - Try direct HTTP first, fallback to NorenApi"""
     global api
     UID = os.getenv("SHOONYA_USERID", "")
     PWD = os.getenv("SHOONYA_PASSWORD", "")
@@ -132,7 +189,24 @@ def shoonya_login() -> bool:
         trade_data["last_error"] = "Missing env vars: SHOONYA_USERID/SHOONYA_PASSWORD/TOTP_SECRET"
         return False
 
+    # Try direct HTTP login first (correct payload format)
+    success, result = shoonya_login_direct_http()
+    if success:
+        # Initialize API with session token
+        try:
+            api = ShoonyaApiPy()
+            api.set_session(UID, PWD, result)  # Set session with susertoken
+            trade_data["last_error"] = None
+            trade_data["status"] = "LoginOK"
+            telegram_send("🟢 Model E Bot: Shoonya login OK (Direct HTTP)")
+            return True
+        except Exception as e:
+            trade_data["last_error"] = f"Session setup failed: {e}"
+            return False
+    
+    # Fallback to NorenApi method
     try:
+        print(f"⚠️ Direct HTTP login failed: {result}, trying NorenApi fallback...")
         api = ShoonyaApiPy()
         otp = pyotp.TOTP(TOTP_KEY).now()
         ret = api.login(
@@ -147,7 +221,7 @@ def shoonya_login() -> bool:
         if ret and ret.get("stat") == "Ok":
             trade_data["last_error"] = None
             trade_data["status"] = "LoginOK"
-            telegram_send("🟢 Model E Bot: Shoonya login OK")
+            telegram_send("🟢 Model E Bot: Shoonya login OK (NorenApi)")
             return True
 
         err = ret.get("emsg", "Unknown error") if ret else "No response"

@@ -21,7 +21,7 @@
             <div>
                 <h1 class="text-4xl font-black tracking-tighter neon-text text-cyan-400">MODEL E</h1>
                 <p class="text-xs uppercase tracking-[0.3em] text-gray-500 font-bold">Institutional Trading Engine</p>
-            </div>
+                    </div>
             <div id="status-badge" class="px-4 py-2 rounded-full glass text-xs font-bold text-green-400 flex items-center gap-2">
                 <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>
                 ENGINE LIVE
@@ -34,7 +34,7 @@
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Market Volatility (VIX)</p>
                 <h3 id="vix" class="text-3xl font-mono font-bold text-white">--.--</h3>
                 <p id="vix-close" class="text-xs text-gray-400 mt-1">Prev: --.--</p>
-            </div>
+                    </div>
             <div class="glass p-6 rounded-3xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Active Scaling Gear</p>
                 <h3 id="gear" class="text-3xl font-mono font-bold text-orange-400">Neutral</h3>
@@ -58,7 +58,7 @@
                     <div class="flex justify-between items-baseline">
                         <h4 id="spot-ltp" class="text-2xl font-bold font-mono">--</h4>
                         <span id="spot-close" class="text-xs text-gray-400">Prev: --</span>
-                    </div>
+                </div>
                     <p id="spot-change" class="text-xs mt-1">--</p>
                 </div>
                 <div class="glass p-4 rounded-xl border-l-2 border-cyan-500">
@@ -66,7 +66,7 @@
                     <div class="flex justify-between items-baseline">
                         <h4 id="fut-curr-ltp" class="text-2xl font-bold font-mono">--</h4>
                         <span id="fut-curr-close" class="text-xs text-gray-400">Prev: --</span>
-                    </div>
+                </div>
                     <p id="fut-curr-change" class="text-xs mt-1">--</p>
                 </div>
                 <div class="glass p-4 rounded-xl">
@@ -74,23 +74,11 @@
                     <div class="flex justify-between items-baseline">
                         <h4 id="fut-next-ltp" class="text-2xl font-bold font-mono">--</h4>
                         <span id="fut-next-close" class="text-xs text-gray-400">Prev: --</span>
-                    </div>
+            </div>
                     <p id="fut-next-change" class="text-xs mt-1">--</p>
                 </div>
             </div>
-            <!-- Basis/Spread Info -->
-            <div class="mt-4 pt-4 border-t border-gray-700">
-                <div class="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                        <span class="text-gray-500">Current Basis:</span>
-                        <span id="curr-basis" class="font-mono font-bold text-cyan-400 ml-2">--</span>
-                    </div>
-                    <div>
-                        <span class="text-gray-500">Next Basis:</span>
-                        <span id="next-basis" class="font-mono font-bold text-purple-400 ml-2">--</span>
-                    </div>
-                </div>
-            </div>
+            <!-- Basis/Spread Info (Now shown inline above) -->
         </div>
 
         <!-- Health Indicators -->
@@ -98,7 +86,7 @@
             <div class="glass p-4 rounded-xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Engine Latency</p>
                 <p id="latency" class="text-lg font-mono font-bold text-green-400">-- ms</p>
-            </div>
+                                </div>
             <div class="glass p-4 rounded-xl">
                 <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">API Connectivity</p>
                 <p id="api-status" class="text-lg font-mono font-bold text-green-400">Connected</p>

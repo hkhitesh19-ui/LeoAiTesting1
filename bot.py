@@ -752,11 +752,15 @@ def bot_loop():
             trade_data["lastClose"] = fut_curr_close if fut_curr_close > 0 else fut_curr_ltp
             trade_data["last_close"] = trade_data["lastClose"]
             
-            # Model E VIX and Gear
+            # Model E VIX and Gear with Change Detection
             trade_data["current_vix"] = vix_ltp
             if MODEL_E_AVAILABLE:
-                trade_data["current_gear"] = get_gear_from_vix(vix_ltp)
+                new_gear = get_gear_from_vix(vix_ltp)
+                trade_data["current_gear"] = new_gear
                 trade_data["gear_status"] = get_gear_status(vix_ltp)
+                
+                # Check for gear change and send Telegram alert
+                check_gear_change(vix_ltp, new_gear)
             
             # Update timestamps
             t = datetime.now().strftime("%H:%M:%S")

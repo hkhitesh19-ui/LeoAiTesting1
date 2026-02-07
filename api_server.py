@@ -307,6 +307,9 @@ def get_status_strict(response: Response):
         fut_next_ltp=fut_next_ltp,
         fut_next_close=fut_next_close,
         friction="-8.00 pts",
+        # Server-side basis calculation for reliability
+        curr_basis=round(fut_curr_ltp - spot_ltp, 2) if (fut_curr_ltp > 0 and spot_ltp > 0) else 0.0,
+        next_basis=round(fut_next_ltp - spot_ltp, 2) if (fut_next_ltp > 0 and spot_ltp > 0) else 0.0,
     )
     return payload
 

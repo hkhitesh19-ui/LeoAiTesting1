@@ -179,11 +179,9 @@ def shoonya_login_direct_http():
             "source": "API"
         }
         
-        # Shoonya API endpoint - Use correct endpoint
-        # Note: NorenApi uses 'prism.shoonya.com/api' but direct HTTP may need different endpoint
-        # Try standard endpoint first
-        BASE_URL = "https://prism.shoonya.com/api"
-        url = f"{BASE_URL}/QuickAuth"
+        # Shoonya API endpoint - Use /NorenWClientTP/ gateway (Production Gateway)
+        BASE_URL = "https://api.shoonya.com/NorenWClientTP/"
+        url = f"{BASE_URL}QuickAuth"
         
         # Send request with correct format
         res = requests.post(url, data=f'jData={json.dumps(payload)}', 

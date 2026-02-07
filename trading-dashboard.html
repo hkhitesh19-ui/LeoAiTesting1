@@ -188,9 +188,9 @@
                 futNextChangeEl.innerText = `${futNextChange >= 0 ? '+' : ''}${futNextChange.toFixed(2)} (${((futNextChange/futNextClose)*100).toFixed(2)}%)`;
                 futNextChangeEl.className = `text-xs mt-1 ${futNextChange >= 0 ? 'price-up' : 'price-down'}`;
                 
-                // Basis Calculation - Real-time (Future - Spot)
-                const currBasis = futCurrLtp - spotLtp;
-                const nextBasis = futNextLtp - spotLtp;
+                // Basis Calculation - Use server-side calculated values (more reliable)
+                const currBasis = data.curr_basis !== undefined ? data.curr_basis : (futCurrLtp - spotLtp);
+                const nextBasis = data.next_basis !== undefined ? data.next_basis : (futNextLtp - spotLtp);
                 
                 // Update inline basis badges
                 const currBasisInline = document.getElementById('curr-basis-inline');

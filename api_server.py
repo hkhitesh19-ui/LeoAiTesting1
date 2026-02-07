@@ -95,6 +95,9 @@ class StatusResponse(BaseModel):
     fut_next_ltp: float = 0.0
     fut_next_close: float = 0.0
     friction: str = "-8.00 pts"
+    # Server-side basis calculation
+    curr_basis: float = 0.0
+    next_basis: float = 0.0
 
 
 # =========================

@@ -201,9 +201,12 @@ def shoonya_login_direct_http():
     except Exception as e:
         return False, f"Login exception: {e}"
 
+# Global susertoken for direct HTTP API calls
+_susertoken = None
+
 def shoonya_login() -> bool:
     """Login to Shoonya API - Try direct HTTP first, fallback to NorenApi"""
-    global api
+    global api, _susertoken
     UID = os.getenv("SHOONYA_USERID", "")
     PWD = os.getenv("SHOONYA_PASSWORD", "")
     TOTP_KEY = os.getenv("TOTP_SECRET", "")
@@ -215,7 +218,8 @@ def shoonya_login() -> bool:
     # Try direct HTTP login first (correct payload format)
     success, result = shoonya_login_direct_http()
     if success:
-        # Initialize API with session token
+        _susertoken = result  # Store susertoken for direct HTTP calls
+        # Initialize API with session token for backward compatibility
         try:
             api = ShoonyaApiPy()
             api.set_session(UID, PWD, result)  # Set session with susertoken
@@ -255,30 +259,89 @@ def shoonya_login() -> bool:
         trade_data["last_error"] = f"Login exception: {e}"
         return False
 
-def resolve_futures_tokens():
-    """Nifty Current aur Next Month Futures ke tokens find karta hai"""
-    global TOKENS
+def resolve_futures_tokens(susertoken=None):
+    """Automatic Future Token Resolution using /NorenWClientTP/ gateway"""
+    global TOKENS, _susertoken
+    BASE_URL = "https://api.shoonya.com/NorenWClientTP/"
+    
+    # Use stored susertoken if not provided
+    if susertoken is None:
+        susertoken = _susertoken
+    
+    if not susertoken:
+        print("⚠️ No susertoken available for token resolution")
+        return None
+    
     try:
-        # NFO Search for NIFTY Futures
-        ret = api.searchscrip(exchange='NFO', searchtext='NIFTY')
-        if ret and 'values' in ret:
-            # Filter for FUTIDX and sort by expiry
-            futs = [item for item in ret['values'] if item.get('instname') == 'FUTIDX']
-            if futs:
-                # Sort by expiry date
-                futs.sort(key=lambda x: datetime.strptime(x.get('expd', '01-Jan-2000'), '%d-%b-%Y'))
-                
+        UID = os.getenv('SHOONYA_USERID', '')
+        payload = {"uid": UID, "stext": "NIFTY", "exch": "NFO"}
+        res = requests.post(f"{BASE_URL}SearchScrip", 
+                          data=f'jData={json.dumps(payload)}&jKey={susertoken}',
+                          headers={"Content-Type": "application/x-www-form-urlencoded"},
+                          timeout=15)
+        result = res.json()
+        
+        if result.get('stat') == 'Ok':
+            # Filter for Nifty Futures (FUTIDX)
+            futs = [i for i in result['values'] if i.get('instname') == 'FUTIDX']
+            # Sort by expiry to identify Current and Next
+            futs.sort(key=lambda x: datetime.strptime(x.get('expd', '01-Jan-2000'), '%d-%b-%Y'))
+            
+            if len(futs) >= 2:
                 TOKENS["FUT_CURR"] = futs[0].get('token', '')
-                if len(futs) > 1:
-                    TOKENS["FUT_NEXT"] = futs[1].get('token', '')
+                TOKENS["FUT_NEXT"] = futs[1].get('token', '')
                 
-                print(f"✅ Tokens Resolved: Curr={TOKENS['FUT_CURR']}, Next={TOKENS['FUT_NEXT']}")
+                tokens = {
+                    "SPOT": "26000",
+                    "VIX": "26017",
+                    "CURR": TOKENS["FUT_CURR"],
+                    "NEXT": TOKENS["FUT_NEXT"]
+                }
+                
+                print(f"✅ Tokens Resolved: Curr={tokens['CURR']} | Next={tokens['NEXT']}")
                 trade_data["fut_token"] = TOKENS["FUT_CURR"]  # For backward compatibility
                 if futs[0].get('tsym'):
                     trade_data["symbol"] = futs[0].get('tsym', '')
+                return tokens
+            else:
+                print("⚠️ Insufficient futures found")
+                return None
+        else:
+            print(f"⚠️ SearchScrip failed: {result.get('emsg', 'Unknown error')}")
+            return None
     except Exception as e:
-        print(f"⚠️ Token resolution error: {e}")
+        print(f"❌ Token resolution error: {e}")
         trade_data["last_error"] = f"Token resolution failed: {e}"
+        return None
+
+def get_shoonya_data(susertoken, tokens):
+    """Fetches LTP and Last Closing Prices for Trinity View using /NorenWClientTP/"""
+    BASE_URL = "https://api.shoonya.com/NorenWClientTP/"
+    results = {}
+    
+    try:
+        UID = os.getenv('SHOONYA_USERID', '')
+        for key, tok in tokens.items():
+            if not tok:
+                continue
+            # Determine exchange based on token
+            exch = "NSE" if "26" in str(tok) else "NFO"
+            payload = {"uid": UID, "exch": exch, "token": tok}
+            res = requests.post(f"{BASE_URL}GetQuotes",
+                              data=f'jData={json.dumps(payload)}&jKey={susertoken}',
+                              headers={"Content-Type": "application/x-www-form-urlencoded"},
+                              timeout=15)
+            result = res.json()
+            if result.get('stat') == 'Ok':
+                # 'lp' = LTP, 'c' = Last Closing Price
+                results[key] = {
+                    "ltp": float(result.get('lp', 0)),
+                    "close": float(result.get('c', result.get('pc', 0)))
+                }
+        return results
+    except Exception as e:
+        print(f"⚠️ GetQuotes error: {e}")
+        return results
 
 def get_market_data() -> Dict[str, Dict[str, float]]:
     """Spot, Futures aur VIX ka LTP aur Closing Price fetch karta hai"""

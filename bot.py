@@ -105,8 +105,8 @@ api = None
 _bot_thread = None
 _stop_flag = False
 
-def telegram_send(msg: str):
-    """Optional telegram: only if env vars exist."""
+def telegram_send(msg: str, parse_mode: str = "HTML"):
+    """Optional telegram: only if env vars exist. Supports HTML formatting."""
     try:
         token = os.getenv("TELEGRAM_TOKEN", "")
         chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -114,9 +114,34 @@ def telegram_send(msg: str):
             return
         import requests
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, data={"chat_id": chat_id, "text": msg}, timeout=8)
-    except Exception:
-        pass
+        payload = {"chat_id": chat_id, "text": msg, "parse_mode": parse_mode}
+        requests.post(url, json=payload, timeout=8)
+    except Exception as e:
+        print(f"❌ Telegram Error: {e}")
+
+# Global variable to track last gear for change detection
+_last_gear = None
+
+def check_gear_change(current_vix: float, current_gear: int):
+    """Check if gear changed and send Telegram alert - SuperProfessional Feature"""
+    global _last_gear
+    if current_gear != _last_gear:
+        status_map = {
+            0: "⚪ No Trade",
+            1: "🟢 Low (Gear 1)",
+            2: "🟠 Medium (Gear 2)",
+            3: "🔴 High (Gear 3)"
+        }
+        msg = (
+            f"<b>🚀 Model E Gear Change</b>\n\n"
+            f"📊 VIX: {current_vix:.2f}\n"
+            f"⚙️ New Status: {status_map.get(current_gear, 'Unknown')}\n"
+            f"💰 Capital: ₹ 5,00,000\n"
+            f"🕒 Time: {datetime.now().strftime('%H:%M:%S')}"
+        )
+        telegram_send(msg)
+        _last_gear = current_gear
+        print(f"📢 Gear Change Alert: {status_map.get(current_gear, 'Unknown')} (VIX: {current_vix:.2f})")
 
 def _safe_float(x) -> float:
     try:

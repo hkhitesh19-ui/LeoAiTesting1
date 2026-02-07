@@ -84,7 +84,27 @@
                     <p id="fut-next-change" class="text-xs mt-1">--</p>
                 </div>
             </div>
-            <!-- Basis/Spread Info (Now shown inline above) -->
+            <!-- Basis Visualization - Progress Bars -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div class="glass p-3 rounded-lg border-l-4 border-orange-500">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs text-gray-400 uppercase font-bold">Current Basis</span>
+                        <span id="curr-basis-val" class="font-bold text-orange-400 font-mono">0.00</span>
+                    </div>
+                    <div class="w-full bg-gray-700 h-1.5 mt-2 rounded-full overflow-hidden">
+                        <div id="curr-basis-bar" class="bg-orange-500 h-full transition-all duration-300" style="width: 50%"></div>
+                    </div>
+                </div>
+                <div class="glass p-3 rounded-lg border-l-4 border-purple-500">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs text-gray-400 uppercase font-bold">Next Basis (Roll)</span>
+                        <span id="next-basis-val" class="font-bold text-purple-400 font-mono">0.00</span>
+                    </div>
+                    <div class="w-full bg-gray-700 h-1.5 mt-2 rounded-full overflow-hidden">
+                        <div id="next-basis-bar" class="bg-purple-500 h-full transition-all duration-300" style="width: 50%"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Health Indicators -->

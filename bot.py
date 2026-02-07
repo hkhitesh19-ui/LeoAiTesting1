@@ -748,8 +748,17 @@ def bot_loop():
 
     trade_data["status"] = "LoginOK"
 
-    # Resolve futures tokens (Current + Next)
-    resolve_futures_tokens()
+    # Resolve futures tokens (Current + Next) using direct HTTP
+    tokens = resolve_futures_tokens(_susertoken)
+    if not tokens:
+        # Fallback to NorenApi method
+        resolve_futures_tokens()
+        tokens = {
+            "SPOT": TOKENS.get("NIFTY_SPOT", "26000"),
+            "VIX": TOKENS.get("VIX", "26017"),
+            "CURR": TOKENS.get("FUT_CURR", ""),
+            "NEXT": TOKENS.get("FUT_NEXT", "")
+        }
 
     if _stop_flag:
         trade_data["status"] = "Stopped"
@@ -770,44 +779,57 @@ def bot_loop():
             
             trade_data["last_run"] = datetime.now(timezone.utc).isoformat()
 
-            # Fetch all market data (Trinity View) - Clean implementation
-            quotes = {}
-            try:
-                quotes["VIX"] = api.get_quotes(exchange='NSE', token=TOKENS["VIX"])
-                quotes["SPOT"] = api.get_quotes(exchange='NSE', token=TOKENS["NIFTY_SPOT"])
-                if TOKENS["FUT_CURR"]:
-                    quotes["FUT_C"] = api.get_quotes(exchange='NFO', token=TOKENS["FUT_CURR"])
-                if TOKENS["FUT_NEXT"]:
-                    quotes["FUT_N"] = api.get_quotes(exchange='NFO', token=TOKENS["FUT_NEXT"])
-            except Exception as e:
-                print(f"⚠️ Quote fetch error: {e}")
+            # Fetch all market data (Trinity View) using direct HTTP for real closing prices
+            if _susertoken and tokens:
+                shoonya_data = get_shoonya_data(_susertoken, tokens)
+                # Map to expected format
+                vix_ltp = _safe_float(shoonya_data.get("VIX", {}).get("ltp", 0))
+                vix_close = _safe_float(shoonya_data.get("VIX", {}).get("close", 0))
+                spot_ltp = _safe_float(shoonya_data.get("SPOT", {}).get("ltp", 0))
+                spot_close = _safe_float(shoonya_data.get("SPOT", {}).get("close", 0))
+                fut_curr_ltp = _safe_float(shoonya_data.get("CURR", {}).get("ltp", 0))
+                fut_curr_close = _safe_float(shoonya_data.get("CURR", {}).get("close", 0))
+                fut_next_ltp = _safe_float(shoonya_data.get("NEXT", {}).get("ltp", 0))
+                fut_next_close = _safe_float(shoonya_data.get("NEXT", {}).get("close", 0))
+            else:
+                # Fallback to NorenApi method
                 quotes = {}
-            
-            # Update trade_data with Trinity View data (for api_server.py)
-            # Extract and update all market data
-            vix_ltp = _safe_float(quotes.get("VIX", {}).get('lp', 0))
-            vix_close = _safe_float(quotes.get("VIX", {}).get('c', quotes.get("VIX", {}).get('pc', 0)))
-            
-            spot_ltp = _safe_float(quotes.get("SPOT", {}).get('lp', 0))
-            spot_close = _safe_float(quotes.get("SPOT", {}).get('c', quotes.get("SPOT", {}).get('pc', 0)))
-            
-            fut_curr_ltp = _safe_float(quotes.get("FUT_C", {}).get('lp', 0))
-            fut_curr_close = _safe_float(quotes.get("FUT_C", {}).get('c', quotes.get("FUT_C", {}).get('pc', 0)))
-            
-            fut_next_ltp = _safe_float(quotes.get("FUT_N", {}).get('lp', 0))
-            fut_next_close = _safe_float(quotes.get("FUT_N", {}).get('c', quotes.get("FUT_N", {}).get('pc', 0)))
+                try:
+                    quotes["VIX"] = api.get_quotes(exchange='NSE', token=TOKENS["VIX"])
+                    quotes["SPOT"] = api.get_quotes(exchange='NSE', token=TOKENS["NIFTY_SPOT"])
+                    if TOKENS["FUT_CURR"]:
+                        quotes["FUT_C"] = api.get_quotes(exchange='NFO', token=TOKENS["FUT_CURR"])
+                    if TOKENS["FUT_NEXT"]:
+                        quotes["FUT_N"] = api.get_quotes(exchange='NFO', token=TOKENS["FUT_NEXT"])
+                except Exception as e:
+                    print(f"⚠️ Quote fetch error: {e}")
+                    quotes = {}
+                
+                # Extract and update all market data
+                vix_ltp = _safe_float(quotes.get("VIX", {}).get('lp', 0))
+                vix_close = _safe_float(quotes.get("VIX", {}).get('c', quotes.get("VIX", {}).get('pc', 0)))
+                
+                spot_ltp = _safe_float(quotes.get("SPOT", {}).get('lp', 0))
+                spot_close = _safe_float(quotes.get("SPOT", {}).get('c', quotes.get("SPOT", {}).get('pc', 0)))
+                
+                fut_curr_ltp = _safe_float(quotes.get("FUT_C", {}).get('lp', 0))
+                fut_curr_close = _safe_float(quotes.get("FUT_C", {}).get('c', quotes.get("FUT_C", {}).get('pc', 0)))
+                
+                fut_next_ltp = _safe_float(quotes.get("FUT_N", {}).get('lp', 0))
+                fut_next_close = _safe_float(quotes.get("FUT_N", {}).get('c', quotes.get("FUT_N", {}).get('pc', 0)))
             
             # Update trade_data dictionary - This is what api_server.py reads
+            # Use real closing prices from GetQuotes API (no fallback calculations)
             trade_data.update({
                 "status": "Running",  # Ensure status stays Running
                 "vix_ltp": vix_ltp,
-                "vix_close": vix_close if vix_close > 0 else vix_ltp * 0.96,
+                "vix_close": vix_close,  # Real closing price from API
                 "spot_ltp": spot_ltp,
-                "spot_close": spot_close if spot_close > 0 else spot_ltp * 0.98,
+                "spot_close": spot_close,  # Real closing price from API
                 "fut_curr_ltp": fut_curr_ltp,
-                "fut_curr_close": fut_curr_close if fut_curr_close > 0 else fut_curr_ltp,
+                "fut_curr_close": fut_curr_close,  # Real closing price from API
                 "fut_next_ltp": fut_next_ltp,
-                "fut_next_close": fut_next_close if fut_next_close > 0 else fut_next_ltp,
+                "fut_next_close": fut_next_close,  # Real closing price from API
                 "heartbeat": datetime.now().strftime("%H:%M:%S"),  # Real heartbeat timestamp
             })
             

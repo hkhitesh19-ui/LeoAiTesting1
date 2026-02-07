@@ -191,11 +191,31 @@
                 // Basis Calculation - Real-time (Future - Spot)
                 const currBasis = futCurrLtp - spotLtp;
                 const nextBasis = futNextLtp - spotLtp;
+                
                 // Update inline basis badges
                 const currBasisInline = document.getElementById('curr-basis-inline');
                 const nextBasisInline = document.getElementById('next-basis-inline');
                 if (currBasisInline) currBasisInline.innerText = currBasis.toFixed(2);
                 if (nextBasisInline) nextBasisInline.innerText = nextBasis.toFixed(2);
+                
+                // Update basis visualization (progress bars)
+                const currBasisVal = document.getElementById('curr-basis-val');
+                const nextBasisVal = document.getElementById('next-basis-val');
+                const currBasisBar = document.getElementById('curr-basis-bar');
+                const nextBasisBar = document.getElementById('next-basis-bar');
+                
+                if (currBasisVal) currBasisVal.innerText = currBasis.toFixed(2);
+                if (nextBasisVal) nextBasisVal.innerText = nextBasis.toFixed(2);
+                
+                // Progress bar calculation (normalize to 0-100% based on typical basis range 0-100)
+                // Basis typically ranges from 0 to 100 points, so we normalize accordingly
+                const maxBasis = 100; // Maximum expected basis
+                const currBasisPercent = Math.min(100, Math.max(0, (currBasis / maxBasis) * 100));
+                const nextBasisPercent = Math.min(100, Math.max(0, (nextBasis / maxBasis) * 100));
+                
+                if (currBasisBar) currBasisBar.style.width = `${currBasisPercent}%`;
+                if (nextBasisBar) nextBasisBar.style.width = `${nextBasisPercent}%`;
+                
                 // Update bottom basis display (if exists)
                 const currBasisEl = document.getElementById('curr-basis');
                 const nextBasisEl = document.getElementById('next-basis');

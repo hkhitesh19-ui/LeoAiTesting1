@@ -61,20 +61,26 @@
                 </div>
                     <p id="spot-change" class="text-xs mt-1">--</p>
                 </div>
-                <div class="glass p-4 rounded-xl border-l-2 border-cyan-500">
-                    <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Current Future</p>
+                <div class="glass p-4 rounded-xl border-l-2 border-cyan-500 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-[10px] text-orange-400 uppercase font-bold">Current Future</p>
+                        <span class="text-[10px] bg-orange-500/20 px-2 py-0.5 rounded text-orange-300">Basis: <span id="curr-basis-inline" class="font-mono font-bold">--</span></span>
+                    </div>
                     <div class="flex justify-between items-baseline">
                         <h4 id="fut-curr-ltp" class="text-2xl font-bold font-mono">--</h4>
                         <span id="fut-curr-close" class="text-xs text-gray-400">Prev: --</span>
-                </div>
+                    </div>
                     <p id="fut-curr-change" class="text-xs mt-1">--</p>
                 </div>
                 <div class="glass p-4 rounded-xl">
-                    <p class="text-[10px] text-gray-500 uppercase font-bold mb-2">Next Future</p>
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-[10px] text-purple-400 uppercase font-bold">Next Future</p>
+                        <span class="text-[10px] bg-purple-500/20 px-2 py-0.5 rounded text-purple-300">Basis: <span id="next-basis-inline" class="font-mono font-bold">--</span></span>
+                    </div>
                     <div class="flex justify-between items-baseline">
                         <h4 id="fut-next-ltp" class="text-2xl font-bold font-mono">--</h4>
                         <span id="fut-next-close" class="text-xs text-gray-400">Prev: --</span>
-            </div>
+                    </div>
                     <p id="fut-next-change" class="text-xs mt-1">--</p>
                 </div>
             </div>
@@ -162,11 +168,19 @@
                 futNextChangeEl.innerText = `${futNextChange >= 0 ? '+' : ''}${futNextChange.toFixed(2)} (${((futNextChange/futNextClose)*100).toFixed(2)}%)`;
                 futNextChangeEl.className = `text-xs mt-1 ${futNextChange >= 0 ? 'price-up' : 'price-down'}`;
                 
-                // Basis Calculation
+                // Basis Calculation - Real-time (Future - Spot)
                 const currBasis = futCurrLtp - spotLtp;
                 const nextBasis = futNextLtp - spotLtp;
-                document.getElementById('curr-basis').innerText = currBasis.toFixed(2);
-                document.getElementById('next-basis').innerText = nextBasis.toFixed(2);
+                // Update inline basis badges
+                const currBasisInline = document.getElementById('curr-basis-inline');
+                const nextBasisInline = document.getElementById('next-basis-inline');
+                if (currBasisInline) currBasisInline.innerText = currBasis.toFixed(2);
+                if (nextBasisInline) nextBasisInline.innerText = nextBasis.toFixed(2);
+                // Update bottom basis display (if exists)
+                const currBasisEl = document.getElementById('curr-basis');
+                const nextBasisEl = document.getElementById('next-basis');
+                if (currBasisEl) currBasisEl.innerText = currBasis.toFixed(2);
+                if (nextBasisEl) nextBasisEl.innerText = nextBasis.toFixed(2);
                 
                 // API Status
                 const apiStatus = data.bot_connected ? 'Connected' : 'Disconnected';
